@@ -135,3 +135,40 @@ def test_failed_export_preserves_destination(tmp_path):
         export_track(tmp_path / 'track', target)
     assert target.read_bytes() == b'previous export'
     assert not target.with_suffix('.wav.part').exists()
+
+
+def test_queue_saturation_fails_instead_of_silent_loss(tmp_path):
+    class BurstStream(FakeStream):
+        def start_stream(self):
+            for _ in range(120):
+                self.callback(b'\0\0' * 10, 10, 0)
+
+    class BurstBackend(FakeBackend):
+        def open(self, device, callback):
+            stream = BurstStream(callback)
+            self.streams.append(stream)
+            self.opened.set()
+            return stream
+
+    store, session = run_session(tmp_path, BurstBackend())
+    assert 'saturée' in session.error
+    assert store.list()[0]['status'] == 'failed'
+
+
+def test_disk_failure_stops_and_releases_sources(tmp_path, monkeypatch):
+    def disk_full(*args):
+        raise OSError('disk full')
+
+    monkeypatch.setattr(FragmentWriter, 'write', disk_full)
+    backend = FakeBackend()
+    store, session = run_session(tmp_path, backend)
+    assert 'disk full' in session.error
+    assert store.list()[0]['status'] == 'failed'
+    assert backend.closed and all(stream.closed for stream in backend.streams)
+
+
+def test_native_audio_dependency_loads_on_windows():
+    import sys
+    if sys.platform == 'win32':
+        import pyaudiowpatch
+        assert pyaudiowpatch.paWASAPI is not None

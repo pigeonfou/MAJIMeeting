@@ -27,10 +27,12 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 
 ## Tests exécutés
 - Socle : CI GitHub initiale réussie sur `32caf8a` (runs 40665214004 et 40665505399).
-- Local Linux Python 3.12 : 9 tests réussis ; Ruff réussi ; démarrage Qt offscreen réussi.
+- Local Linux Python 3.12 : 12 tests réussis ; Ruff réussi ; démarrage Qt offscreen réussi.
 - Tests : catalogue, interruption, export bit à bit, fragments partiels, deux sources,
   échec d'ouverture, incident audio, PCM invalide, conservation d'un export existant,
-  récupération et changement de thème dans l'interface.
+  récupération et changement de thème dans l'interface, saturation et disque plein simulés.
+- Première CI Linux en échec : bibliothèque native Qt `libEGL.so.1` absente du runner.
+  Correction : installation explicite de libegl1 et libopengl0 avant les tests.
 - CI du développement et installateur Windows : résultats à consigner après exécution.
 - Capture matérielle WASAPI, réunions longues et RTX : non testées dans cet environnement.
 

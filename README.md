@@ -10,7 +10,7 @@ Application Windows locale de capture, transcription multi-interlocuteurs et ré
 - Traçabilité des décisions vers les passages horodatés.
 - Export PDF, DOCX, Markdown et TXT.
 
-**Statut :** amorçage du projet. Aucune release Windows validée à ce stade.
+**Statut :** jalon 1 en développement. Prototype d'enregistrement ; aucune release stable validée.
 
 ## Développement
 Python 3.11+, PySide6, SQLite. Installation de développement :
