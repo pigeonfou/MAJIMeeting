@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -76,7 +77,10 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(body, 'Enregistrement et réunions')
         self.processing = ProcessingPanel(self)
-        tabs.addTab(self.processing, 'Import et transcription')
+        processing_scroll = QScrollArea()
+        processing_scroll.setWidgetResizable(True)
+        processing_scroll.setWidget(self.processing)
+        tabs.addTab(processing_scroll, 'Import et transcription')
         self.meetings.currentItemChanged.connect(self.processing.selected)
         self.setCentralWidget(tabs)
         recovered = self.store.recover()
@@ -163,7 +167,10 @@ class MainWindow(QMainWindow):
                             break
                     self.status.setText('Import terminé. Réunion sélectionnée pour transcription.')
                 elif kind == 'transcribe':
-                    self.status.setText('Transcription terminée ; consultez le mode de calcul dans l’historique.')
+                    warnings = sum(self.store.warning_counts(result).values())
+                    self.status.setText(
+                        f'Transcription terminée avec {warnings} avertissement(s) d’horodatage à vérifier.'
+                        if warnings else 'Transcription terminée ; consultez le mode de calcul dans l’historique.')
                 elif kind == 'download':
                     self.status.setText('Modèle installé. La transcription fonctionne hors ligne.')
                 else:
