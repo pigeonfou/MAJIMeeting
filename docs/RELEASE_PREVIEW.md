@@ -1,20 +1,19 @@
-# MAJIMeeting 0.2.1 — correctif du téléchargement du modèle
+# MAJIMeeting 0.2.2 — CUDA indisponible et repli CPU
 
-Le téléchargement affiche maintenant l'étape, le fichier, les Mo reçus et le pourcentage.
-Il est annulable et reprenable, utilise des délais réseau explicites et vérifie l'intégrité
-des fichiers avant installation. Les fichiers complets déjà présents sont reconnus.
-Un diagnostic local est disponible dans `download.log` dans le dossier du modèle.
+Corrige le blocage de transcription provoqué par une bibliothèque CUDA absente ou non
+chargeable, notamment `cublas64_12.dll`.
 
-Le téléchargement utilise HTTPS directement sans charger le moteur d'inférence.
-L'entrée PyInstaller est protégée pour les sous-processus d'une application Windows gelée.
-La CI teste désormais un vrai téléchargement depuis le programme installé, suivi d'une
-inférence CPU hors ligne avec ces mêmes fichiers ; l'interface et l'annulation sont testées.
+- Vérification des DLL NVIDIA et du pilote avant l'inférence ; découverte des dossiers
+  standard CUDA/cuDNN et champ facultatif pour une installation personnalisée.
+- Case visible autorisant le repli CPU/int8. Le mode effectif et la raison sont conservés
+  dans l'historique. La case peut être décochée pour exiger CUDA.
+- Prise en charge des échecs GPU tardifs : libération du modèle puis reprise complète
+  CPU, sans doublons de segments ni modification des transcriptions précédentes.
 
-Installer cette mise à jour puis relancer le bouton Télécharger large-v3. Les réunions et
-transcriptions existantes sont conservées. Les anciens fichiers complets sont vérifiés ;
-les caches partiels provenant du SDK précédent ne sont pas réutilisés.
+Pour transcrire immédiatement, choisir CPU/int8 avec le modèle déjà téléchargé.
+Pour activer le GPU, installer cuBLAS CUDA 12 et cuDNN 9 pour CUDA 12 depuis NVIDIA ;
+voir docs/CUDA_WINDOWS.md. L'installateur ne fournit pas ces bibliothèques.
 
-Large-v3 reste un téléchargement séparé (~3 Go). CUDA/cuDNN ne sont pas inclus.
-La cause exacte du blocage sur le PC utilisateur n'a pas été reproduite à distance :
-le nouveau parcours doit encore y être confirmé. Les essais large-v3/CUDA, longue durée
-et les autres tests matériels en attente ne sont pas déclarés réussis.
+La CI teste les erreurs CUDA simulées, l'annulation, l'affichage du repli et une vraie
+inférence CPU après DLL manquante simulée, y compris dans le programme Windows installé.
+La performance et le fonctionnement GPU sur la RTX utilisateur restent à confirmer.

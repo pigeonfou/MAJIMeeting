@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QLabel,
@@ -73,7 +74,16 @@ class ProcessingPanel(QWidget):
         layout.addWidget(QLabel('Calcul : CPU ou CUDA ; quantification'))
         layout.addWidget(self.device)
         layout.addWidget(self.compute)
-        layout.addWidget(QLabel('CUDA : bibliothèques NVIDIA requises ; CPU disponible sans GPU.'))
+        layout.addWidget(QLabel('CUDA : cuBLAS CUDA 12 + cuDNN 9 requis ; CPU sans GPU disponible.'))
+        self.cuda_path = QLineEdit(str(self.settings.value('cuda_path', '')))
+        self.cuda_path.setPlaceholderText('Dossier des DLL NVIDIA (facultatif, si déjà installées)')
+        layout.addWidget(self.cuda_path)
+        self.cuda_browse = QPushButton('Choisir le dossier CUDA / cuDNN…')
+        self.cuda_browse.clicked.connect(self.choose_cuda_path)
+        layout.addWidget(self.cuda_browse)
+        self.cpu_fallback = QCheckBox('Si CUDA est indisponible, reprendre sur CPU/int8')
+        self.cpu_fallback.setChecked(self.settings.value('cpu_fallback', True, type=bool))
+        layout.addWidget(self.cpu_fallback)
         self.transcribe_button = QPushButton('Transcrire la réunion sélectionnée en français')
         self.transcribe_button.clicked.connect(self.transcribe)
         layout.addWidget(self.transcribe_button)
@@ -85,6 +95,9 @@ class ProcessingPanel(QWidget):
         self.jobs = QComboBox()
         self.jobs.currentIndexChanged.connect(self.show_transcript)
         layout.addWidget(self.jobs)
+        self.execution = QLabel('')
+        self.execution.setWordWrap(True)
+        layout.addWidget(self.execution)
         self.text = QPlainTextEdit()
         self.text.setReadOnly(True)
         layout.addWidget(self.text)
@@ -99,7 +112,8 @@ class ProcessingPanel(QWidget):
 
     def set_busy(self, active):
         for widget in (self.import_button, self.model, self.browse, self.download, self.device,
-                       self.compute, self.transcribe_button, self.export_button):
+                       self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
+                       self.transcribe_button, self.export_button):
             widget.setEnabled(not active)
         if not active:
             self.cancel_button.setEnabled(False)
@@ -150,6 +164,13 @@ class ProcessingPanel(QWidget):
             self.model.setText(path)
             self.settings.setValue('model', path)
 
+    def choose_cuda_path(self):
+        path = QFileDialog.getExistingDirectory(self, 'Dossier des bibliothèques NVIDIA',
+                                                self.cuda_path.text())
+        if path:
+            self.cuda_path.setText(path)
+            self.settings.setValue('cuda_path', path)
+
     def fetch_model(self):
         destination = self.model.text().strip()
         if not destination:
@@ -170,9 +191,13 @@ class ProcessingPanel(QWidget):
             self.window.status.setText('Sélectionnez d’abord une réunion.')
             return
         options = TranscriptionOptions(self.model.text().strip(), self.device.currentText(),
-                                       self.compute.currentText())
+                                       self.compute.currentText(),
+                                       allow_cpu_fallback=self.cpu_fallback.isChecked(),
+                                       cuda_library_path=self.cuda_path.text().strip())
         self.settings.setValue('model', options.model_path)
         self.settings.setValue('device', options.device)
+        self.settings.setValue('cuda_path', options.cuda_library_path)
+        self.settings.setValue('cpu_fallback', options.allow_cpu_fallback)
         self.submit('transcribe', transcribe_meeting, self.window.store, self.current_meeting,
                     options, self.cancel, self.progress, cancellable=True)
 
@@ -188,11 +213,20 @@ class ProcessingPanel(QWidget):
         if self.current_meeting:
             for row in self.window.store.transcription_jobs(self.current_meeting):
                 self.jobs.addItem(f"{row['created'][:19]} [{row['status']}] {row['error']}", row['id'])
+                self.jobs.setItemData(self.jobs.count() - 1, row['options'],
+                                      Qt.ItemDataRole.UserRole + 1)
         self.jobs.blockSignals(False)
         self.show_transcript()
 
     def show_transcript(self):
         job = self.jobs.currentData()
+        options_json = self.jobs.currentData(Qt.ItemDataRole.UserRole + 1)
+        execution = json.loads(options_json).get('execution', {}) if options_json else {}
+        actual = f"{execution.get('device', '?')}/{execution.get('compute_type', '?')}"
+        reason = execution.get('fallback_reason')
+        self.execution.setText((f'Calcul réellement utilisé : {actual}. ' +
+                                (f'Repli CPU car CUDA indisponible : {reason}' if reason else ''))
+                               if execution else '')
         self.text.setPlainText('\n'.join(
             f"[{timestamp(row['start'])} → {timestamp(row['end'])}] {row['track']} : {row['text']}"
             for row in self.window.store.segments(job)) if job else '')

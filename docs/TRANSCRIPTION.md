@@ -16,7 +16,8 @@ Les pistes enregistrées sont traitées séparément, sans mélange ni identific
 - CPU/int8 est le réglage initial. CPU/float32, CUDA/int8_float16 et CUDA/float16 sont proposés.
 - CUDA nécessite les bibliothèques NVIDIA compatibles avec CTranslate2 : CUDA 12/cuBLAS
   et cuDNN 9 pour la branche actuelle. Elles ne sont pas fournies dans cette préversion.
-  En cas d'erreur CUDA, choisir CPU/int8 et relancer ; aucun résultat précédent n'est écrasé.
+  En cas d’indisponibilité CUDA, l’option de repli CPU/int8 permet une reprise automatique.
+  Cette option est visible et peut être désactivée ; les transcriptions précédentes sont conservées.
 - Après installation du modèle, la transcription utilise le dossier local avec
   `local_files_only=True`. Aucun téléchargement de modèle pendant la transcription.
 
@@ -68,3 +69,21 @@ Les téléchargements utilisent HTTPS directement, sans charger le moteur d'inf�
 Le test Windows installé télécharge réellement un modèle tiny via ce même composant,
  puis lance l'inférence avec ce dossier en mode hors ligne. Il ne télécharge pas les 3 Go
  de large-v3 dans la CI. Les essais utilisateur large-v3/CUDA restent nécessaires.
+
+## CUDA indisponible — 0.2.2
+
+Le message `Library cublas64_12.dll is not found or cannot be loaded` concerne le calcul
+NVIDIA, pas les poids Whisper. Choisir **CPU / int8** permet de transcrire sans ces DLL.
+
+En CUDA, la case **Si CUDA est indisponible, reprendre sur CPU/int8** autorise une reprise
+explicite. Les bibliothèques et le pilote sont vérifiés avant l'inférence. Le modèle GPU
+est libéré avant chargement du modèle CPU. Si l'erreur survient pendant l'itération paresseuse
+des segments, la tentative est recommencée en entier : ses segments GPU partiels sont
+remplacés par la sortie CPU, sans doublons ni modification des tentatives précédentes.
+L'historique conserve le mode effectif, la quantification et la raison du repli.
+Les erreurs non liées à CUDA et les annulations ne déclenchent pas une relance CPU.
+
+Les dossiers standard CUDA 12/cuDNN 9 et les variables CUDA_PATH/CUDNN_PATH sont explorés.
+Le champ facultatif des DLL permet d'indiquer un dossier déjà installé, sans modifier le
+PATH système. Les DLL et le pilote ne sont pas fournis par cette préversion.
+Voir [l'installation GPU Windows](CUDA_WINDOWS.md) pour les sources officielles NVIDIA.

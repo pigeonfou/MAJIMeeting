@@ -85,3 +85,20 @@ def test_model_download_button_reports_progress_and_can_cancel(tmp_path, monkeyp
     assert panel.download.isEnabled()
     window.close()
     app.processEvents()
+
+
+def test_history_shows_cpu_fallback_reason(tmp_path):
+    from majimeeting.transcription import TranscriptionOptions
+    app = QApplication.instance() or QApplication([])
+    store = MeetingStore(tmp_path / 'data')
+    meeting = store.create('Repli CPU')
+    store.finish(meeting, 'completed')
+    store.start_transcription('fallback', meeting, TranscriptionOptions('local'))
+    store.set_execution('fallback', 'cpu', 'int8', 'cublas64_12.dll absente')
+    store.finish_transcription('fallback', 'completed')
+    window = MainWindow(store, scan=False)
+    window.meetings.setCurrentRow(0)
+    assert 'cpu/int8' in window.processing.execution.text()
+    assert 'cublas64_12.dll' in window.processing.execution.text()
+    window.close()
+    app.processEvents()
