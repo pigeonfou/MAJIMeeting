@@ -2,7 +2,7 @@
 
 - [ ] J1 (socle validé partiellement, essais complémentaires à réaliser) : capture audio Windows fiable, stockage et reprise après interruption.
 - [ ] J2 : import audio, Whisper et transcription horodatée.
-- [ ] J3 : diarisation, identification manuelle et éditeur synchronisé.
+- [ ] J3 (première partie en cours) : éditeur, attribution manuelle et réécoute ; diarisation automatique à venir.
 - [ ] J4 : génération locale de rapports, actions et décisions sourcées.
 - [ ] J5 : exports, performances, confidentialité, sauvegardes.
 - [ ] J6 : essais réels sur RTX 3080 Laptop 16 Go, installateur et release Windows.

@@ -29,6 +29,10 @@ class MeetingStore:
                 track TEXT NOT NULL, batch_offset REAL NOT NULL, raw_start TEXT NOT NULL,
                 raw_end TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL)""")
             db.execute('CREATE INDEX IF NOT EXISTS warnings_job ON transcription_warnings(job_id)')
+            db.execute('''CREATE TABLE IF NOT EXISTS segment_edits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, segment_id INTEGER NOT NULL,
+                created TEXT NOT NULL, text TEXT NOT NULL, speaker TEXT NOT NULL)''')
+            db.execute('CREATE INDEX IF NOT EXISTS edits_segment ON segment_edits(segment_id,id)')
 
     @contextmanager
     def connect(self):
@@ -122,8 +126,34 @@ class MeetingStore:
 
     def segments(self, job):
         with self.connect() as db:
-            return db.execute("SELECT * FROM transcript_segments WHERE job_id=? "
-                              "ORDER BY start,track,id", (job,)).fetchall()
+            return db.execute('''SELECT s.*, s.text AS original_text,
+                              COALESCE(e.text,s.text) AS corrected_text,
+                              COALESCE(e.speaker,'') AS speaker
+                              FROM transcript_segments s LEFT JOIN segment_edits e ON e.id=(
+                                  SELECT MAX(id) FROM segment_edits WHERE segment_id=s.id)
+                              WHERE s.job_id=? ORDER BY s.start,s.track,s.id''', (job,)).fetchall()
+
+    def edit_segment(self, segment_id, text, speaker):
+        text, speaker = text.strip(), speaker.strip()
+        if not text:
+            raise ValueError('Le texte ne peut pas être vide.')
+        if len(speaker) > 200:
+            raise ValueError('Le nom est limité à 200 caractères.')
+        with self.connect() as db:
+            row = db.execute('''SELECT j.status FROM transcript_segments s
+                              JOIN transcription_jobs j ON j.id=s.job_id WHERE s.id=?''',
+                             (segment_id,)).fetchone()
+            if row is None:
+                raise ValueError('Segment introuvable.')
+            if row['status'] == 'running':
+                raise ValueError('Attendez la fin du traitement avant de corriger.')
+            db.execute('INSERT INTO segment_edits(segment_id,created,text,speaker) VALUES(?,?,?,?)',
+                       (segment_id, datetime.now(UTC).isoformat(), text, speaker))
+
+    def segment_history(self, segment_id):
+        with self.connect() as db:
+            return db.execute('SELECT * FROM segment_edits WHERE segment_id=? ORDER BY id',
+                              (segment_id,)).fetchall()
 
     def list(self):
         with self.connect() as db:

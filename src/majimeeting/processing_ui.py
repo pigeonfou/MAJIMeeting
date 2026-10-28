@@ -110,6 +110,9 @@ class ProcessingPanel(QWidget):
         self.export_button = QPushButton('Exporter la transcription (TXT ou JSON)…')
         self.export_button.clicked.connect(self.export)
         layout.addWidget(self.export_button)
+        self.edit_button = QPushButton('Corriger les textes, nommer les intervenants et réécouter…')
+        self.edit_button.clicked.connect(self.open_editor)
+        layout.addWidget(self.edit_button)
 
     def device_changed(self, device):
         self.compute.clear()
@@ -119,7 +122,7 @@ class ProcessingPanel(QWidget):
     def set_busy(self, active):
         for widget in (self.import_button, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
-                       self.transcribe_button, self.export_button):
+                       self.transcribe_button, self.export_button, self.edit_button):
             widget.setEnabled(not active)
         if not active:
             self.cancel_button.setEnabled(False)
@@ -242,8 +245,18 @@ class ProcessingPanel(QWidget):
                                    f"{warning_count - counts.get('clipped', 0)} segment(s) écarté(s). "
                                    'Voir les avertissements pour vérifier ces passages.')
         self.text.setPlainText('\n'.join(
-            f"[{timestamp(row['start'])} → {timestamp(row['end'])}] {row['track']} : {row['text']}"
+            f"[{timestamp(row['start'])} → {timestamp(row['end'])}] "
+            f"{row['speaker'] or 'Inconnu'} ({row['track']}) : {row['corrected_text']}"
             for row in self.window.store.segments(job)) if job else '')
+
+    def open_editor(self):
+        job = self.jobs.currentData()
+        if not job:
+            return
+        from majimeeting.editor_ui import TranscriptEditor
+        dialog = TranscriptEditor(self.window.store, job, self)
+        dialog.exec()
+        self.show_transcript()
 
     def show_warnings(self):
         job = self.jobs.currentData()
@@ -283,6 +296,8 @@ class ProcessingPanel(QWidget):
 
     def write_export(self, job, path):
         rows = [dict(row) for row in self.window.store.segments(job)]
+        for row in rows:
+            row['text'] = row.pop('corrected_text')
         if Path(path).suffix.lower() == '.json':
             text = json.dumps({'job_id': job, 'segments': rows,
                                'timestamp_warnings': [dict(row) for row in
@@ -290,7 +305,7 @@ class ProcessingPanel(QWidget):
                               ensure_ascii=False, indent=2)
         else:
             text = '\n'.join(f"[{timestamp(r['start'])} → {timestamp(r['end'])}] "
-                             f"{r['track']} : {r['text']}" for r in rows)
+                             f"{r['speaker'] or 'Inconnu'} ({r['track']}) : {r['text']}" for r in rows)
         if Path(path).suffix.lower() != '.json':
             count = sum(self.window.store.warning_counts(job).values())
             if count:

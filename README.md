@@ -44,3 +44,6 @@ une réunion enregistrée. Choisir un modèle local faster-whisper (ou télécha
 avec le bouton dédié), puis CPU/int8 ou CUDA si les bibliothèques NVIDIA sont installées.
 La transcription française est horodatée, persistante, consultable et exportable TXT/JSON.
 Voir [le guide de transcription](docs/TRANSCRIPTION.md) pour les essais et limites.
+
+La préversion 0.2.4 ajoute [les corrections et la réécoute](docs/EDITOR.md), avec
+attribution manuelle des noms et historique. La diarisation automatique reste à intégrer.

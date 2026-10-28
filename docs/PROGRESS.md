@@ -3,7 +3,7 @@
 Mise à jour : 28 octobre 2026.
 
 ## État global
-Jalon 2 en cours, sur accord utilisateur après les essais de capture réussis.
+Jalon 2 en validation utilisateur ; première partie du jalon 3 en développement.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
 conservés à réaliser. Aucune release stable validée.
 Le socle initial au commit `32caf8a` a été intégralement relu (neuf fichiers).
@@ -30,8 +30,8 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 
 ## Jalons
 - Réalisé avec validation partielle : J1 enregistrement ; essais complémentaires à réaliser.
-- En cours : J2 import audio et transcription locale horodatée.
-- À réaliser : J3 diarisation/éditeur ; J4 comptes rendus ;
+- En cours : validation J2 et J3 éditeur, correction manuelle et lecture synchronisée.
+- À réaliser : suite J3 diarisation automatique ; J4 comptes rendus ;
   J5 exports documentaires/sauvegardes ; J6 validation complète et release stable.
 
 ## Tests exécutés
@@ -87,14 +87,15 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   Téléchargement des poids annulable et reprenable depuis le bouton ; délais réseau explicites.
 - Les imports conservent l'original et décodent la première piste audio en mono 16 kHz.
 - Aucun locuteur identifié : les noms track-XX désignent des sources, pas des personnes.
-  Pas encore de diarisation, lecture synchronisée, correction ni compte rendu.
-- Prototype sans signature de code ; aucune validation large-v3/CUDA à ce stade.
+  Noms attribuables manuellement et corrections disponibles ; diarisation et compte rendu à venir.
+- Prototype sans signature de code ; traitement CUDA observé sur le PC utilisateur,
+  fin complète et qualité large-v3 encore à confirmer.
 
 ## Prochaines actions
-1. Installer la préversion J2 et télécharger large-v3 pour les essais utilisateur.
-2. Tester large-v3 sur audio français représentatif, en CPU puis sur RTX/CUDA.
-3. Réaliser ultérieurement les essais J1 restants, sans bloquer J2 à la demande utilisateur.
-4. Évaluer les frontières de lots et la dérive des sources avant diarisation/éditeur (J3).
+1. Valider les corrections, la réécoute et la transcription complète sur le PC utilisateur.
+2. Intégrer pyannote Community-1 et les attributions des locuteurs (suite J3).
+3. Réaliser ultérieurement les essais J1 restants, sans bloquer la suite du développement.
+4. Évaluer les frontières de lots et la dérive des sources avant validation stable.
 
 ## Références
 - Base : `32caf8a0512db0a9629c5e53756630edc64917c9`.
@@ -214,3 +215,22 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   nouvelle tentative de la réunion existante ; elle repart du début, sans réimporter l'audio.
 - À confirmer sur la réunion utilisateur : traitement complet et vérification des
   avertissements. Les tests automatisés ne prouvent pas l'exactitude des paroles reconnues.
+
+## Jalon 3 — première partie, éditeur et réécoute
+
+- Reprise sur main `742ab95e6a3fec48fd9c60d2a599d01e52c30c58`, sans portage de Biscotti.
+- Corrections et noms saisis par passage, historique SQLite additif, original et temps
+  conservés ; restauration auditable ; exports TXT/JSON utilisant la version corrigée.
+- Lecteur Qt Multimedia : extrait local borné à 60 s, préparation dans un worker,
+  conservation des décalages et des trous entre fragments. Aucune dépendance IA chargée.
+- Local : 61 tests réussis ; Ruff réussi ; test réel du décodeur WAV Qt et de l'éditeur
+  réussi sans sortie audio physique. Aucun résultat Windows encore obtenu pour cet ajout.
+- CI étendue au décodage Qt et au test de l'éditeur dans le programme Windows installé.
+- À réaliser : écoute et corrections sur le PC utilisateur, tests matériels J1 restants,
+  fin complète/qualité de la transcription de la réunion après correctif 0.2.3.
+- Prochaine partie J3 : pyannote Community-1 local, gestion des locuteurs détectés et
+  chevauchements. Aucun intervenant n'est détecté automatiquement dans cette préversion.
+- Les comptes rendus sourcés, exports documentaires et validation stable restent à réaliser.
+
+- Premier passage CI J3 : import de Qt Multimedia impossible sur le runner Linux
+  faute de `libpulse.so.0`. Ajout explicite de `libpulse0` au workflow ; nouvelle CI requise.
