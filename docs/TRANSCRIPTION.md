@@ -106,3 +106,10 @@ l'exactitude du texte reconnu, et le correctif ne reconstitue aucune parole manq
 Les tentatives antérieures restent consultables. Après mise à jour, relancer la transcription
 de la réunion existante ; il n'est pas nécessaire de réimporter l'audio ni le modèle.
 Les erreurs de décodage, de disque ou de modèle continuent à être signalées en erreur.
+
+## Accélération GPU — 0.2.5
+
+La transcription peut désormais grouper les portions de décodage sur GPU, avec choix de
+la taille et du profil de recherche. Les mesures finales figurent dans l'historique.
+Voir [les réglages et le protocole de comparaison](PERFORMANCE.md). Le mode séquentiel,
+les horodatages contrôlés et les corrections restent disponibles.

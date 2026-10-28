@@ -3,6 +3,7 @@ import gc
 import json
 import math
 import tempfile
+import time
 import uuid
 import wave
 from concurrent.futures import CancelledError
@@ -22,6 +23,9 @@ class TranscriptionOptions:
     language: str = 'fr'
     allow_cpu_fallback: bool = True
     cuda_library_path: str = ''
+    batched: bool = False
+    batch_size: int = 8
+    beam_size: int = 5
 
     def validate(self):
         folder = Path(self.model_path)
@@ -31,6 +35,8 @@ class TranscriptionOptions:
         allowed = {'cpu': {'int8', 'float32'}, 'cuda': {'float16', 'int8_float16'}}
         if self.device not in allowed or self.compute_type not in allowed[self.device]:
             raise ValueError('Combinaison appareil/quantification non prise en charge.')
+        if self.batch_size not in {1, 2, 4, 8, 16} or self.beam_size not in {1, 5}:
+            raise ValueError('Taille de lot ou profil de qualité invalide.')
 
 
 def check_cancel(cancel):
@@ -129,7 +135,7 @@ def audio_batches(track, destination, cancel=None, max_seconds=300):
 
 
 def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda message: None,
-                       model_factory=None, cuda_prepare=None):
+                       model_factory=None, cuda_prepare=None, pipeline_factory=None):
     options.validate()
     check_cancel(cancel)
     tracks = sorted((store.root / meeting_id).glob('track-*'))
@@ -138,31 +144,56 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
         raise ValueError('Aucune piste audio finalisée à transcrire.')
     job = uuid.uuid4().hex
     store.start_transcription(job, meeting_id, options)
-    effective = options
-    retry_cpu = False
+    effective, reason = options, ''
+    started = time.perf_counter()
+    metrics = {'attempts': []}
     try:
-        store.set_execution(job, options.device, options.compute_type)
-        try:
-            if options.device == 'cuda':
-                (cuda_prepare or prepare_cuda)(options.cuda_library_path)
-            _run_inference(store, job, tracks, effective, cancel, progress, model_factory)
-        except (RuntimeError, OSError) as exc:
-            if options.device != 'cuda' or not is_cuda_error(exc):
-                raise
-            if not options.allow_cpu_fallback:
-                raise RuntimeError(f'CUDA indisponible : {exc} '
-                                   'Choisissez CPU/int8 ou configurez les bibliothèques NVIDIA.') from exc
+        while True:
             check_cancel(cancel)
-            reason = str(exc)
-            progress(f'CUDA indisponible : {reason} Reprise complète sur CPU/int8.')
-            effective = replace(options, device='cpu', compute_type='int8')
-            # Delete only this attempt's GPU segments, avoiding duplicates on full restart.
-            store.set_execution(job, 'cpu', 'int8', reason, reset_segments=True)
-            retry_cpu = True
-        if retry_cpu:
-            # Exit the exception handler first: its traceback may retain the failed GPU model.
+            attempt = {'device': effective.device, 'batched': effective.batched,
+                       'batch_size': effective.batch_size if effective.batched else 1,
+                       'model_load_seconds': 0.0, 'prepare_seconds': 0.0,
+                       'inference_seconds': 0.0, 'save_seconds': 0.0,
+                       'completed_audio_seconds': 0.0}
+            metrics['attempts'].append(attempt)
+            store.set_execution(job, effective.device, effective.compute_type, reason,
+                                reset_segments=len(metrics['attempts']) > 1,
+                                batched=effective.batched,
+                                batch_size=attempt['batch_size'], beam_size=effective.beam_size)
+            retry = False
+            try:
+                if effective.device == 'cuda':
+                    (cuda_prepare or prepare_cuda)(effective.cuda_library_path)
+                _run_inference(store, job, tracks, effective, cancel, progress, model_factory,
+                               pipeline_factory, attempt)
+            except (RuntimeError, OSError) as exc:
+                oom = any(token in str(exc).lower() for token in (
+                    'out of memory', 'cuda_error_out_of_memory', 'cublas_status_alloc_failed'))
+                if effective.device != 'cuda' or not (oom or is_cuda_error(exc)):
+                    raise
+                check_cancel(cancel)
+                if oom and effective.batched and effective.batch_size > 1:
+                    size = max(1, effective.batch_size // 2)
+                    reason = f'Mémoire GPU insuffisante : réduction du lot à {size}.'
+                    effective = replace(effective, batch_size=size)
+                elif oom and effective.batched:
+                    reason = 'Mémoire GPU insuffisante : reprise CUDA séquentielle.'
+                    effective = replace(effective, batched=False, batch_size=1)
+                elif effective.allow_cpu_fallback:
+                    reason = str(exc)
+                    effective = replace(effective, device='cpu', compute_type='int8',
+                                        batched=False, batch_size=1)
+                    progress(f'CUDA indisponible : {reason} Reprise complète sur CPU/int8.')
+                else:
+                    raise RuntimeError(f'CUDA indisponible : {exc} '
+                                       'Choisissez CPU/int8 ou configurez les bibliothèques NVIDIA.') from exc
+                attempt['error'] = str(exc)
+                progress(reason + ' Reprise depuis le début ; anciennes tentatives conservées.')
+                retry = True
+            if not retry:
+                break
+            # Exit the exception handler first: tracebacks can retain the failed GPU pipeline.
             gc.collect()
-            _run_inference(store, job, tracks, effective, cancel, progress, model_factory)
         check_cancel(cancel)
         store.finish_transcription(job, 'completed')
         return job
@@ -170,49 +201,91 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
         state = 'cancelled' if isinstance(exc, CancelledError) else 'failed'
         store.finish_transcription(job, state, str(exc))
         raise
+    finally:
+        metrics['total_seconds'] = time.perf_counter() - started
+        store.set_transcription_metrics(job, metrics)
 
 
-def _run_inference(store, job, tracks, options, cancel, progress, model_factory):
-    model = None
-    segments = None
+def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
+                   pipeline_factory, metrics):
+    model = runner = segments = None
     try:
         if model_factory is None:
             from faster_whisper import WhisperModel
             model_factory = WhisperModel
         progress(f'Chargement du modèle local sur {options.device}/{options.compute_type}…')
-        model = model_factory(options.model_path, device=options.device,
-                              compute_type=options.compute_type, local_files_only=True)
+        before = time.perf_counter()
+        try:
+            model = model_factory(options.model_path, device=options.device,
+                                  compute_type=options.compute_type, local_files_only=True)
+            runner = model
+            if options.batched:
+                if pipeline_factory is None:
+                    from faster_whisper import BatchedInferencePipeline
+                    pipeline_factory = BatchedInferencePipeline
+                runner = pipeline_factory(model=model)
+        finally:
+            metrics['model_load_seconds'] += time.perf_counter() - before
         with tempfile.TemporaryDirectory(prefix='majimeeting-') as temp:
             batch_path = Path(temp) / 'batch.wav'
             for track in tracks:
-                for offset, duration in audio_batches(track, batch_path, cancel):
+                batches = iter(audio_batches(track, batch_path, cancel))
+                while True:
                     check_cancel(cancel)
-                    progress(f'{track.name} : transcription à partir de {offset:.0f} s')
-                    segments, _ = model.transcribe(str(batch_path), language=options.language,
-                                                   beam_size=5, vad_filter=True)
-                    for segment in segments:
+                    before = time.perf_counter()
+                    try:
+                        offset, duration = next(batches)
+                    except StopIteration:
+                        break
+                    finally:
+                        metrics['prepare_seconds'] += time.perf_counter() - before
+                    progress(f'{track.name} : transcription à partir de {offset:.0f} s '
+                             f"({'lots de ' + str(options.batch_size) if options.batched else 'séquentiel'}, "
+                             f'beam={options.beam_size})')
+                    kwargs = {'language': options.language, 'beam_size': options.beam_size,
+                              'vad_filter': True, 'without_timestamps': False}
+                    if options.batched:
+                        kwargs['batch_size'] = options.batch_size
+                    before = time.perf_counter()
+                    try:
+                        segments, _ = runner.transcribe(str(batch_path), **kwargs)
+                        segments = iter(segments)
+                    finally:
+                        metrics['inference_seconds'] += time.perf_counter() - before
+                    while True:
+                        check_cancel(cancel)
+                        before = time.perf_counter()
+                        try:
+                            segment = next(segments)
+                        except StopIteration:
+                            break
+                        finally:
+                            metrics['inference_seconds'] += time.perf_counter() - before
                         check_cancel(cancel)
                         text = segment.text.strip()
                         if not text:
                             continue
                         bounds, warning = normalize_timestamps(segment.start, segment.end, duration)
-                        if warning:
-                            store.add_transcription_warning(job, track.name, offset,
-                                                            segment.start, segment.end,
-                                                            warning, text)
-                        if bounds is None:
-                            continue
-                        start, end = bounds
-                        store.add_segment(job, track.name, offset + start, offset + end, text)
-                        progress(f'{track.name} : {offset + end:.0f} s traitées')
-                    # Completion is based on source duration, including silent batches.
+                        before = time.perf_counter()
+                        try:
+                            if warning:
+                                store.add_transcription_warning(job, track.name, offset,
+                                                                segment.start, segment.end,
+                                                                warning, text)
+                            if bounds is not None:
+                                start, end = bounds
+                                store.add_segment(job, track.name, offset + start, offset + end, text)
+                        finally:
+                            metrics['save_seconds'] += time.perf_counter() - before
+                        if bounds is not None:
+                            progress(f'{track.name} : {offset + end:.0f} s traitées')
+                    metrics['completed_audio_seconds'] += duration
                     progress(f'{track.name} : {offset + duration:.0f} s traitées')
     finally:
-        # Close the lazy iterator too: it can otherwise retain the failed GPU model.
+        # A lazy iterator or pipeline can otherwise retain the failed GPU model.
         if segments is not None and hasattr(segments, 'close'):
             segments.close()
-        segments = None
-        model = None
+        segments = runner = model = None
         gc.collect()
 
 

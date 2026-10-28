@@ -76,6 +76,22 @@ class ProcessingPanel(QWidget):
         layout.addWidget(QLabel('Calcul : CPU ou CUDA ; quantification'))
         layout.addWidget(self.device)
         layout.addWidget(self.compute)
+        self.batched = QCheckBox('Traitement par lots sur GPU (recommandé)')
+        self.batched.setChecked(self.settings.value('batched', True, type=bool))
+        layout.addWidget(self.batched)
+        self.batch_size = QComboBox()
+        for size in (1, 2, 4, 8, 16):
+            self.batch_size.addItem(str(size), size)
+        self.batch_size.setCurrentText(str(self.settings.value('batch_size', 8)))
+        layout.addWidget(QLabel('Taille des lots GPU : 8 conseillé pour commencer'))
+        layout.addWidget(self.batch_size)
+        self.quality = QComboBox()
+        self.quality.addItem('Qualité — recherche de 5 hypothèses (réglage précédent)', 5)
+        self.quality.addItem('Rapide — recherche de 1 hypothèse (qualité à comparer)', 1)
+        self.quality.setCurrentIndex(1 if self.settings.value('beam_size', 5, type=int) == 1 else 0)
+        layout.addWidget(self.quality)
+        self.device_changed(self.device.currentText())
+        self.compute.setCurrentText(str(self.settings.value('compute_type', self.compute.currentText())))
         layout.addWidget(QLabel('CUDA : cuBLAS CUDA 12 + cuDNN 9 requis ; CPU sans GPU disponible.'))
         self.cuda_path = QLineEdit(str(self.settings.value('cuda_path', '')))
         self.cuda_path.setPlaceholderText('Dossier des DLL NVIDIA (facultatif, si déjà installées)')
@@ -100,6 +116,9 @@ class ProcessingPanel(QWidget):
         self.execution = QLabel('')
         self.execution.setWordWrap(True)
         layout.addWidget(self.execution)
+        self.performance = QLabel('')
+        self.performance.setWordWrap(True)
+        layout.addWidget(self.performance)
         self.warnings_button = QPushButton('Voir les avertissements d’horodatage…')
         self.warnings_button.clicked.connect(self.show_warnings)
         self.warnings_button.setEnabled(False)
@@ -118,13 +137,19 @@ class ProcessingPanel(QWidget):
         self.compute.clear()
         self.compute.addItems(['int8', 'float32'] if device == 'cpu' else
                               ['int8_float16', 'float16'])
+        if hasattr(self, 'batched'):
+            self.batched.setEnabled(device == 'cuda')
+            self.batch_size.setEnabled(device == 'cuda')
 
     def set_busy(self, active):
         for widget in (self.import_button, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
-                       self.transcribe_button, self.export_button, self.edit_button):
+                       self.transcribe_button, self.export_button, self.edit_button,
+                       self.batched, self.batch_size, self.quality):
             widget.setEnabled(not active)
         if not active:
+            self.batched.setEnabled(self.device.currentText() == 'cuda')
+            self.batch_size.setEnabled(self.device.currentText() == 'cuda')
             self.cancel_button.setEnabled(False)
 
     def progress(self, message, percent=None):
@@ -202,9 +227,16 @@ class ProcessingPanel(QWidget):
         options = TranscriptionOptions(self.model.text().strip(), self.device.currentText(),
                                        self.compute.currentText(),
                                        allow_cpu_fallback=self.cpu_fallback.isChecked(),
-                                       cuda_library_path=self.cuda_path.text().strip())
+                                       cuda_library_path=self.cuda_path.text().strip(),
+                                       batched=self.device.currentText() == 'cuda' and self.batched.isChecked(),
+                                       batch_size=self.batch_size.currentData(),
+                                       beam_size=self.quality.currentData())
         self.settings.setValue('model', options.model_path)
         self.settings.setValue('device', options.device)
+        self.settings.setValue('compute_type', options.compute_type)
+        self.settings.setValue('batched', self.batched.isChecked())
+        self.settings.setValue('batch_size', options.batch_size)
+        self.settings.setValue('beam_size', options.beam_size)
         self.settings.setValue('cuda_path', options.cuda_library_path)
         self.settings.setValue('cpu_fallback', options.allow_cpu_fallback)
         self.submit('transcribe', transcribe_meeting, self.window.store, self.current_meeting,
@@ -230,12 +262,28 @@ class ProcessingPanel(QWidget):
     def show_transcript(self):
         job = self.jobs.currentData()
         options_json = self.jobs.currentData(Qt.ItemDataRole.UserRole + 1)
-        execution = json.loads(options_json).get('execution', {}) if options_json else {}
+        details = json.loads(options_json) if options_json else {}
+        execution = details.get('execution', {})
         actual = f"{execution.get('device', '?')}/{execution.get('compute_type', '?')}"
         reason = execution.get('fallback_reason')
-        self.execution.setText((f'Calcul réellement utilisé : {actual}. ' +
-                                (f'Repli CPU car CUDA indisponible : {reason}' if reason else ''))
+        mode = (f"lots de {execution.get('batch_size', '?')}" if execution.get('batched')
+                else 'séquentiel')
+        self.execution.setText((f"Calcul réellement utilisé : {actual}, {mode}, "
+                                f"beam={execution.get('beam_size', '?')}. " +
+                                (f'Adaptation du calcul : {reason}' if reason else ''))
                                if execution else '')
+        metrics = details.get('metrics', {})
+        attempts = metrics.get('attempts', [])
+        total = metrics.get('total_seconds', 0)
+        audio = attempts[-1].get('completed_audio_seconds', 0) if attempts else 0
+        self.performance.setText(
+            f'Durée totale : {total:.1f} s ; audio traité (somme des pistes) : {audio:.1f} s ; '
+            f'vitesse globale : {audio / total:.2f}× temps réel. '
+            f"Chargement : {sum(a.get('model_load_seconds', 0) for a in attempts):.1f} s ; "
+            f"préparation audio : {sum(a.get('prepare_seconds', 0) for a in attempts):.1f} s ; "
+            f"inférence/VAD : {sum(a.get('inference_seconds', 0) for a in attempts):.1f} s ; "
+            f"écriture : {sum(a.get('save_seconds', 0) for a in attempts):.1f} s ; "
+            f'{len(attempts)} tentative(s) de calcul.' if total > 0 else '')
         counts = self.window.store.warning_counts(job) if job else {}
         warning_count = sum(counts.values())
         self.warnings_button.setEnabled(warning_count > 0)
@@ -298,8 +346,13 @@ class ProcessingPanel(QWidget):
         rows = [dict(row) for row in self.window.store.segments(job)]
         for row in rows:
             row['text'] = row.pop('corrected_text')
+        with self.window.store.connect() as db:
+            details = json.loads(db.execute('SELECT options FROM transcription_jobs WHERE id=?',
+                                           (job,)).fetchone()['options'])
         if Path(path).suffix.lower() == '.json':
             text = json.dumps({'job_id': job, 'segments': rows,
+                               'execution': details.get('execution', {}),
+                               'performance': details.get('metrics', {}),
                                'timestamp_warnings': [dict(row) for row in
                                     self.window.store.transcription_warnings(job)]},
                               ensure_ascii=False, indent=2)

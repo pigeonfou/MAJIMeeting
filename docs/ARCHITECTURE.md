@@ -50,3 +50,13 @@ Qt Multimedia lit un extrait WAV temporaire préparé dans un worker dédié. Le
 utilisent les métadonnées de chaque fragment, avec silence aux trous, sans assemblage
 de la réunion complète. La durée de lecture est bornée à 60 secondes par passage.
 Aucun modèle IA n’est chargé pour éditer ou lire.
+
+## Transcription par lots et mesures
+
+Le worker peut encapsuler WhisperModel dans BatchedInferencePipeline sans charger un
+second modèle. La fenêtre audio disque reste bornée à cinq minutes. Un seul pipeline
+et un seul modèle sont conservés par reprise. Un manque explicite de VRAM réduit les
+lots avant essai du chemin CUDA séquentiel puis éventuel CPU ; les références des
+itérateurs/pipelines sont libérées avant la reprise hors du gestionnaire d’exception.
+Les paramètres demandés, paramètres effectifs et métriques des reprises restent dans
+le JSON `options` des traitements SQLite ; aucune migration destructive.

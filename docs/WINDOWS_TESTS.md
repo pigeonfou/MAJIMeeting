@@ -61,3 +61,14 @@ message exact en cas d'erreur, durée/dérive observée. Ne pas communiquer d'au
 
 Ces essais sont à réaliser ; les tests automatisés de décodage ne remplacent pas une
 écoute sur les périphériques Windows réels.
+
+## Optimisation GPU 0.2.5 — à réaliser
+
+1. Sur une même réunion, relever les métriques avec CUDA séquentiel puis avec lots de 8,
+   même modèle, quantification et profil Qualité. Comparer les mêmes paroles et temps.
+2. Essayer ensuite Rapide puis float16 séparément ; relever les durées et erreurs de texte.
+3. Vérifier Annuler, les exports JSON et le mode/taille effectivement utilisés.
+4. Répéter sans réseau. Les poids du modèle déjà installés suffisent.
+
+Retour utilisateur : intégrations 0.2.4 validées. Ce retour ne clôt pas les tests matériels
+J1 reportés ni les comparaisons de performance et de qualité ci-dessus.
