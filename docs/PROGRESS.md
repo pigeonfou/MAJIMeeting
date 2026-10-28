@@ -159,8 +159,22 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   résultats ni modification d'une tentative antérieure. Annuler ne relance pas le CPU.
 - Historique enrichi avec appareil/quantification effectifs et raison du repli.
 - Local : 42 tests réussis et Ruff réussi. Inférence réelle CPU et repli après DLL
-  manquante simulée réussis avec le modèle tiny. CI et installateur Windows à contrôler.
+  manquante simulée réussis avec le modèle tiny. CI et installateur Windows réussis ; références ci-dessous.
 - Les DLL CUDA/cuDNN restent à installer séparément depuis NVIDIA si l'utilisateur veut
   activer le GPU. La reprise CPU n'est pas une validation de l'accélération RTX.
 - Les autres essais matériels en attente restent à réaliser.
 
+
+## Références du correctif CUDA 0.2.2
+
+- [PR nº 4](https://github.com/pigeonfou/MAJIMeeting/pull/4) fusionnée.
+- Implémentation : `f6498e2` ; priorité du dossier choisi : `d6aff7f` ;
+  correction de la borne de dépendance PyAudioWPatch lors du changement de version : `eefec9f`.
+- Fusion : `692773ff574d7cd7f0c7e7bc145341b57d7b5974`.
+- [CI PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40706044239) et
+  [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40707043390) réussies.
+- 42 tests par système, Ruff, démarrage Qt, téléchargement et inférence CPU réels réussis.
+  Installation Windows et reprise sur vrai moteur CPU après DLL manquante simulée réussies.
+- [Préversion v0.2.2-preview.24](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.2-preview.24) publiée le 28 octobre 2026.
+- À confirmer sur le PC utilisateur : reprise CPU avec large-v3, puis chargement des
+  bibliothèques NVIDIA et accélération réelle RTX. Le GPU n'est pas déclaré validé.
