@@ -102,3 +102,33 @@ def test_history_shows_cpu_fallback_reason(tmp_path):
     assert 'cublas64_12.dll' in window.processing.execution.text()
     window.close()
     app.processEvents()
+
+
+def test_timestamp_warnings_are_visible_and_exported_separately(tmp_path):
+    import json
+
+    from majimeeting.transcription import TranscriptionOptions
+    app = QApplication.instance() or QApplication([])
+    store = MeetingStore(tmp_path / 'data')
+    meeting = store.create('Horodatages')
+    store.finish(meeting, 'completed')
+    store.start_transcription('warning-job', meeting, TranscriptionOptions('local'))
+    store.add_segment('warning-job', 'track-00', 299, 300, 'Texte conservé')
+    store.add_transcription_warning('warning-job', 'track-00', 0, 299, 330, 'clipped',
+                                    'Texte conservé')
+    store.add_transcription_warning('warning-job', 'track-00', 0, 301, 330, 'outside_audio',
+                                    'Texte écarté hors audio')
+    store.finish_transcription('warning-job', 'completed')
+    window = MainWindow(store, scan=False)
+    window.meetings.setCurrentRow(0)
+    panel = window.processing
+    assert panel.warnings_button.isEnabled()
+    assert '1 intervalle(s) ajusté(s)' in panel.execution.text()
+    assert '1 segment(s) écarté(s)' in panel.execution.text()
+    assert 'Texte écarté' not in panel.text.toPlainText()
+    panel.write_export('warning-job', tmp_path / 'audit.json')
+    exported = json.loads((tmp_path / 'audit.json').read_text(encoding='utf-8'))
+    assert len(exported['timestamp_warnings']) == 2
+    assert len(exported['segments']) == 1
+    window.close()
+    app.processEvents()

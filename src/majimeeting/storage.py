@@ -24,6 +24,11 @@ class MeetingStore:
                 id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
                 track TEXT NOT NULL, start REAL NOT NULL, end REAL NOT NULL, text TEXT NOT NULL)""")
             db.execute("CREATE INDEX IF NOT EXISTS segments_job ON transcript_segments(job_id)")
+            db.execute("""CREATE TABLE IF NOT EXISTS transcription_warnings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
+                track TEXT NOT NULL, batch_offset REAL NOT NULL, raw_start TEXT NOT NULL,
+                raw_end TEXT NOT NULL, kind TEXT NOT NULL, text TEXT NOT NULL)""")
+            db.execute('CREATE INDEX IF NOT EXISTS warnings_job ON transcription_warnings(job_id)')
 
     @contextmanager
     def connect(self):
@@ -89,8 +94,26 @@ class MeetingStore:
                                     'fallback_reason': fallback_reason}
             if reset_segments:
                 db.execute('DELETE FROM transcript_segments WHERE job_id=?', (job,))
+                db.execute('DELETE FROM transcription_warnings WHERE job_id=?', (job,))
             db.execute('UPDATE transcription_jobs SET options=? WHERE id=?',
                        (json.dumps(options), job))
+
+    def add_transcription_warning(self, job, track, offset, start, end, kind, text):
+        with self.connect() as db:
+            db.execute('INSERT INTO transcription_warnings '
+                       '(job_id,track,batch_offset,raw_start,raw_end,kind,text) VALUES (?,?,?,?,?,?,?)',
+                       (job, track, offset, str(start), str(end), kind, text))
+
+    def warning_counts(self, job):
+        with self.connect() as db:
+            return {row['kind']: row['count'] for row in db.execute(
+                'SELECT kind,COUNT(*) AS count FROM transcription_warnings WHERE job_id=? '
+                'GROUP BY kind', (job,))}
+
+    def transcription_warnings(self, job, limit=None):
+        with self.connect() as db:
+            return db.execute('SELECT * FROM transcription_warnings WHERE job_id=? ORDER BY id '
+                              'LIMIT ?', (job, -1 if limit is None else limit)).fetchall()
 
     def transcription_jobs(self, meeting_id):
         with self.connect() as db:

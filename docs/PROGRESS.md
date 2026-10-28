@@ -178,3 +178,23 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - [Préversion v0.2.2-preview.24](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.2-preview.24) publiée le 28 octobre 2026.
 - À confirmer sur le PC utilisateur : reprise CPU avec large-v3, puis chargement des
   bibliothèques NVIDIA et accélération réelle RTX. Le GPU n'est pas déclaré validé.
+
+## Correctif des limites temporelles — 28 octobre 2026
+
+- Retour utilisateur : la configuration CUDA a franchi l'erreur de bibliothèque et le
+  traitement cuda/float16 affiche 1200 s traitées, puis échoue sur « Horodatage de
+  transcription invalide ». Validation GPU partielle ; la réunion n'est pas encore validée.
+- Contrôle précédent trop strict : un segment dépassant la durée du lot arrêtait la tâche.
+  Les segments qui recoupent l'audio sont désormais bornés à sa durée réelle ; les sorties
+  hors audio, sans durée ou aux temps non finis/inversés sont écartées et auditées.
+- Avertissements persistants avec temps et texte bruts, compteurs et consultation dans
+  l'interface ; audit complet exporté dans JSON. Aucune parole manquante n'est inventée.
+- Les segments/tentatives précédents sont conservés. Le repli GPU vers CPU ne nettoie
+  que les segments et avertissements de la tentative courante pour éviter les doublons.
+- Local : 57 tests réussis, Ruff et démarrage Qt réussis. Régression synthétique reproduite
+  après quatre lots de cinq minutes et un dernier lot court. Tests des bornes, NaN/infini,
+  texte vide, migration additive de la base et affichage/export de l'audit réussis.
+- Inférence CPU réelle avec tiny et contrôle de régression local réussis. CI et exécutable
+  Windows installé à vérifier avant publication.
+- À confirmer sur la réunion utilisateur : fin complète de la transcription et vérification
+  des passages signalés. Les autres essais matériels en attente gardent leur statut.

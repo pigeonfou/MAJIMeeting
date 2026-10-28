@@ -192,15 +192,21 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory)
                                                    beam_size=5, vad_filter=True)
                     for segment in segments:
                         check_cancel(cancel)
-                        start, end = float(segment.start), float(segment.end)
-                        if not (math.isfinite(start) and math.isfinite(end) and
-                                0 <= start <= duration and start <= end <= duration + 1):
-                            raise ValueError('Horodatage de transcription invalide.')
-                        if segment.text.strip():
-                            store.add_segment(job, track.name, offset + start,
-                                              offset + min(end, duration),
-                                              segment.text.strip())
+                        text = segment.text.strip()
+                        if not text:
+                            continue
+                        bounds, warning = normalize_timestamps(segment.start, segment.end, duration)
+                        if warning:
+                            store.add_transcription_warning(job, track.name, offset,
+                                                            segment.start, segment.end,
+                                                            warning, text)
+                        if bounds is None:
+                            continue
+                        start, end = bounds
+                        store.add_segment(job, track.name, offset + start, offset + end, text)
                         progress(f'{track.name} : {offset + end:.0f} s traitées')
+                    # Completion is based on source duration, including silent batches.
+                    progress(f'{track.name} : {offset + duration:.0f} s traitées')
     finally:
         # Close the lazy iterator too: it can otherwise retain the failed GPU model.
         if segments is not None and hasattr(segments, 'close'):
@@ -208,3 +214,19 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory)
         segments = None
         model = None
         gc.collect()
+
+
+def normalize_timestamps(start, end, duration):
+    """Keep source-backed intervals only; Whisper can timestamp padded tail audio."""
+    try:
+        start, end = float(start), float(end)
+    except (TypeError, ValueError, OverflowError):
+        return None, 'invalid_timestamp'
+    if not (math.isfinite(start) and math.isfinite(end)) or end < start:
+        return None, 'invalid_timestamp'
+    if end <= 0 or start >= duration or start == end:
+        return None, 'outside_audio'
+    bounded = max(0.0, start), min(duration, end)
+    if bounded[0] >= bounded[1]:
+        return None, 'outside_audio'
+    return bounded, 'clipped' if bounded != (start, end) else None

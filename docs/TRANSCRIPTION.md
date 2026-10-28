@@ -87,3 +87,22 @@ Les dossiers standard CUDA 12/cuDNN 9 et les variables CUDA_PATH/CUDNN_PATH sont
 Le champ facultatif des DLL permet d'indiquer un dossier déjà installé, sans modifier le
 PATH système. Les DLL et le pilote ne sont pas fournis par cette préversion.
 Voir [l'installation GPU Windows](CUDA_WINDOWS.md) pour les sources officielles NVIDIA.
+
+## Limites de lots et avertissements — 0.2.3
+
+Whisper peut renvoyer des temps qui dépassent la durée du dernier lot, notamment sur
+sa fin complétée par du silence. Ces segments ne provoquent plus l'arrêt de la réunion.
+Les intervalles qui recoupent l'audio sont bornés à sa durée réelle. Les segments entièrement
+hors audio, sans durée ou aux temps non finis/inversés sont écartés de la transcription
+horodatée. Les sorties vides sont ignorées avant contrôle temporel.
+
+Chaque ajustement ou rejet non vide est conservé dans une table d'audit locale avec piste,
+début du lot, temps bruts, motif et texte brut. L'historique affiche les compteurs et le
+bouton **Voir les avertissements d'horodatage**. L'export JSON ajoute `timestamp_warnings` ;
+l'export TXT signale leur nombre. Les textes rejetés ne sont pas mélangés aux segments
+validés. Ces passages doivent être réécoutés/vérifiés : borner un temps ne prouve pas
+l'exactitude du texte reconnu, et le correctif ne reconstitue aucune parole manquante.
+
+Les tentatives antérieures restent consultables. Après mise à jour, relancer la transcription
+de la réunion existante ; il n'est pas nécessaire de réimporter l'audio ni le modèle.
+Les erreurs de décodage, de disque ou de modèle continuent à être signalées en erreur.

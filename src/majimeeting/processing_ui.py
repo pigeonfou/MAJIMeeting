@@ -8,6 +8,8 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QLabel,
     QLineEdit,
@@ -98,6 +100,10 @@ class ProcessingPanel(QWidget):
         self.execution = QLabel('')
         self.execution.setWordWrap(True)
         layout.addWidget(self.execution)
+        self.warnings_button = QPushButton('Voir les avertissements d’horodatage…')
+        self.warnings_button.clicked.connect(self.show_warnings)
+        self.warnings_button.setEnabled(False)
+        layout.addWidget(self.warnings_button)
         self.text = QPlainTextEdit()
         self.text.setReadOnly(True)
         layout.addWidget(self.text)
@@ -227,9 +233,44 @@ class ProcessingPanel(QWidget):
         self.execution.setText((f'Calcul réellement utilisé : {actual}. ' +
                                 (f'Repli CPU car CUDA indisponible : {reason}' if reason else ''))
                                if execution else '')
+        counts = self.window.store.warning_counts(job) if job else {}
+        warning_count = sum(counts.values())
+        self.warnings_button.setEnabled(warning_count > 0)
+        if warning_count:
+            self.execution.setText(self.execution.text() +
+                                   f" Horodatages : {counts.get('clipped', 0)} intervalle(s) ajusté(s), "
+                                   f"{warning_count - counts.get('clipped', 0)} segment(s) écarté(s). "
+                                   'Voir les avertissements pour vérifier ces passages.')
         self.text.setPlainText('\n'.join(
             f"[{timestamp(row['start'])} → {timestamp(row['end'])}] {row['track']} : {row['text']}"
             for row in self.window.store.segments(job)) if job else '')
+
+    def show_warnings(self):
+        job = self.jobs.currentData()
+        if not job:
+            return
+        rows = self.window.store.transcription_warnings(job, limit=500)
+        labels = {'clipped': 'Intervalle borné à la durée audio',
+                  'outside_audio': 'Segment hors audio ou sans durée : écarté',
+                  'invalid_timestamp': 'Horodatage non exploitable : segment écarté'}
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Avertissements d’horodatage — contrôle de la transcription')
+        dialog.resize(850, 500)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel('Les 500 premiers avertissements sont affichés. '
+                                'L’export JSON conserve l’audit complet.'))
+        details = QPlainTextEdit()
+        details.setReadOnly(True)
+        details.setPlainText('\n\n'.join(
+            f"{row['track']} — lot à {timestamp(row['batch_offset'])} — "
+            f"{labels.get(row['kind'], row['kind'])}\n"
+            f"Temps bruts relatifs au lot : {row['raw_start']} → {row['raw_end']} s\n"
+            f"Texte brut à vérifier : {row['text']}" for row in rows))
+        layout.addWidget(details)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.exec()
 
     def export(self):
         job = self.jobs.currentData()
@@ -243,10 +284,18 @@ class ProcessingPanel(QWidget):
     def write_export(self, job, path):
         rows = [dict(row) for row in self.window.store.segments(job)]
         if Path(path).suffix.lower() == '.json':
-            text = json.dumps({'job_id': job, 'segments': rows}, ensure_ascii=False, indent=2)
+            text = json.dumps({'job_id': job, 'segments': rows,
+                               'timestamp_warnings': [dict(row) for row in
+                                    self.window.store.transcription_warnings(job)]},
+                              ensure_ascii=False, indent=2)
         else:
             text = '\n'.join(f"[{timestamp(r['start'])} → {timestamp(r['end'])}] "
                              f"{r['track']} : {r['text']}" for r in rows)
+        if Path(path).suffix.lower() != '.json':
+            count = sum(self.window.store.warning_counts(job).values())
+            if count:
+                text += (f'\n\nHorodatages : {count} avertissement(s). '
+                         'Consultez l’historique ou l’export JSON pour les détails.')
         target = Path(path)
         temp = target.with_suffix(target.suffix + '.part')
         try:
