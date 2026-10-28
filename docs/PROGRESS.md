@@ -376,3 +376,22 @@ séquentiel relevé ; vérifier texte et avertissements avant de le retenir par 
 - À confirmer sur le PC utilisateur : activation Flash réellement acceptée, gain éventuel
   de deux workers et des grandes fenêtres, VRAM, annulation et qualité. Aucun résultat
   GPU expérimental déclaré réussi avant ce retour.
+
+## Simplification des workflows — 28 octobre 2026
+
+- Demande utilisateur : éviter les exécutions en double et publier l'installateur déjà testé.
+- Push de branche supprimé des déclencheurs ; une seule chaîne complète par PR, anciennes
+  révisions de PR annulées automatiquement. Cache pip ; téléchargement tiny inutilisé retiré
+  du job de construction, téléchargement réel par le programme installé conservé.
+- Manifeste après tests d'installation : arbre/commit source, run/attempt, version, SHA-256.
+- Main réutilise un artefact de PR validé seulement si provenance, PR, CI et arbre Git
+  fusionné correspondent. Sinon tests et construction complets. Publication vérifie les
+  octets et le manifeste ; aucun script de l'artefact n'est exécuté pour promouvoir le fichier.
+- Tag basé sur le numéro du run de construction ; publication idempotente sans écrasement.
+- Local : 11 tests Node des contrôles de promotion réussis, YAML/structure du workflow
+  vérifiés, Ruff et 75 tests Python réussis. Parcours PR puis promotion main à vérifier.
+- Nouvelle capture utilisateur 0.2.6 : CUDA/float16, lots 16, Qualité/beam 5, 1 worker,
+  Flash non, fenêtres 300 s : 1504,4 s-pistes en 84,9 s, 71,6 s inférence/VAD,
+  6,9 s chargement ; 6 lots, 57 portions, remplissage 59,4 %, tailles 11×2, 12×2,
+  10×1 et 1×1 ; un horodatage ajusté, aucun rejet. Ce n'est pas le profil Rapide à 43,2 s.
+- Flash/two-workers/qualité restent en essais utilisateur ; aucun résultat supposé réussi.
