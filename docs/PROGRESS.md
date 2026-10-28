@@ -33,7 +33,11 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   récupération et changement de thème dans l'interface, saturation et disque plein simulés.
 - Première CI Linux en échec : bibliothèque native Qt `libEGL.so.1` absente du runner.
   Correction : installation explicite de libegl1 et libopengl0 avant les tests.
-- CI du développement et installateur Windows : résultats à consigner après exécution.
+- CI de la PR nº 1 réussie : run [40666516564](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40666516564).
+- CI de main réussie : run [40667024555](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40667024555).
+  Sous Windows et Linux : 12 tests, Ruff et démarrage Qt réussis. Construction Windows,
+  démarrage du binaire empaqueté, compilation Inno Setup, installation silencieuse et
+  démarrage du programme installé réussis. Publication de la préversion réussie.
 - Capture matérielle WASAPI, réunions longues et RTX : non testées dans cet environnement.
 
 ## Limites connues
@@ -49,7 +53,7 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Prototype sans signature de code, sans modèles IA ni fonctions des jalons 2 à 5.
 
 ## Prochaines actions
-1. Contrôler les Actions et corriger toute erreur de build/installation.
+1. Télécharger et installer la préversion pour les essais matériels Windows.
 2. Tester microphone + loopback, silence système, débranchement, fermeture forcée,
    puis une réunion longue sur Windows (voir WINDOWS_TESTS.md).
 3. Mesurer décalage/dérive et charge disque ; décider du mécanisme de synchronisation.
@@ -57,5 +61,8 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 
 ## Références
 - Base : `32caf8a0512db0a9629c5e53756630edc64917c9`.
-- Développement : branche `develop/recording-foundation`.
-- Aucune release stable publiée.
+- [PR nº 1](https://github.com/pigeonfou/MAJIMeeting/pull/1) fusionnée.
+- Implémentation : `84becbb` ; tests/CI : `6731a18` ; publication : `bef068c`.
+- Fusion main : `fcd1cd8f5fb47a4f62ba901ce81f58ecc7b11a35`.
+- [Préversion v0.1.0-preview.9](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.1.0-preview.9) : installateur disponible, 28 octobre 2026.
+- Aucune release stable publiée ; essais audio matériels toujours en attente.
