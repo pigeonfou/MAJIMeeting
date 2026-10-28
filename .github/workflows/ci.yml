@@ -71,3 +71,21 @@ jobs:
           name: MAJIMeeting-Windows-preview
           path: dist/MAJIMeeting-0.1.0-preview-Setup.exe
           if-no-files-found: error
+  preview-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: windows-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MAJIMeeting-Windows-preview
+          path: release-assets
+      - name: Publish tested installer as prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v0.1.0-preview.${{ github.run_number }}
+        run: |
+          gh release create "$RELEASE_TAG" release-assets/*.exe --target "$GITHUB_SHA" --prerelease --title "MAJIMeeting $RELEASE_TAG — prototype enregistrement" --notes-file docs/RELEASE_PREVIEW.md
