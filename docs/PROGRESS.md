@@ -395,3 +395,35 @@ séquentiel relevé ; vérifier texte et avertissements avant de le retenir par 
   6,9 s chargement ; 6 lots, 57 portions, remplissage 59,4 %, tailles 11×2, 12×2,
   10×1 et 1×1 ; un horodatage ajusté, aucun rejet. Ce n'est pas le profil Rapide à 43,2 s.
 - Flash/two-workers/qualité restent en essais utilisateur ; aucun résultat supposé réussi.
+- Capture suivante : Flash demandé mais refusé ; reprise CUDA sans Flash visible et
+  calcul effectif Flash non. Profil Qualité/beam 5, 1 worker, fenêtres 300 s, lots 16 :
+  85,6 s total, 71,6 s inférence/VAD, 11,9 s chargement, 2 tentatives ; même remplissage
+  59,4 %, 6 lots et 57 portions. Aucun gain Flash mesuré puisque l'option a été désactivée.
+  La cause native précise n'est pas déduite de ce seul message de reprise.
+- Capture deux workers : CUDA/float16, lots 16, Qualité/beam 5, Flash non, fenêtres 300 s,
+  workers effectifs 2 sans reprise ; 1504,4 s-pistes en 62,1 s (24,23×), chargement 6,2 s,
+  préparation 0,9 s, inférence cumulée 94,8 s, écriture cumulée 1,2 s ; 6 lots, 57 portions,
+  remplissage 59,4 %, un ajustement temporel, aucun rejet. Environ 27 % de temps total
+  en moins que la référence 1 worker à 84,9 s, sur ce relevé unique en Qualité.
+  Les temps d'inférence cumulés ne se comparent pas directement à la durée d'un worker.
+
+## Validation de la publication sans reconstruction
+
+- [PR nº 9](https://github.com/pigeonfou/MAJIMeeting/pull/9) fusionnée ; implémentation
+  `7c26d7609f2785125f7ad99d40830769f1cc65ef`, lecture UTF-8/manifeste testé dans
+  `667f1ae055597cd9be044489e88403ac8563da0e` ; fusion
+  `17fde50506936bae9904d5f1786211f9d450c6ad`.
+- [CI PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40756745079) réussie :
+  76 tests Python et 11 tests Node par système, contrôles Qt/inférence réels, construction,
+  installation et contrôles de l'application installée réussis ; manifeste produit.
+- Aucun workflow de push de branche observé. L'exécution obsolète 40756584503 a été
+  annulée automatiquement à l'arrivée de la révision suivante.
+- [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40757819354) réussie :
+  plan et publication réussis, jobs test et windows-package sautés. Durée du run main
+  observée entre run_started_at et updated_at : 31 secondes. Une seule construction validée.
+- [Préversion de vérification v0.2.6-preview.42](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.6-preview.42)
+  publiée depuis l'artefact du run de PR, avec son manifeste. SHA-256 de l'EXE publié
+  identique à celui validé : `7a46119623dc4453895dbcb33c0845ae8142ca0aa81b7a85f7854523a18ebe5c`.
+- Aucun changement fonctionnel de l'application ; aucune réinstallation nécessaire pour
+  bénéficier de cette simplification des futurs builds. Les contrôles restent complets
+  si l'arbre fusionné diffère ou si aucun artefact utilisable n'est disponible.

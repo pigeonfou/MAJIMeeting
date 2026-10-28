@@ -43,3 +43,13 @@ arbitraire, chemin de fichier non autorisé et altération d'EXE/manifeste.
 La validation de bout en bout doit montrer une seule construction sur la PR puis les jobs
 test et windows-package sautés sur main, avec publication de l'empreinte issue de cette PR.
 La première exécution sans cache n'est pas une mesure de gain des dépendances.
+
+## Première validation de bout en bout
+
+PR nº 9 : [construction validée 40756745079](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40756745079),
+76 tests Python et 11 tests Node par système, tests de l'installateur réussis.
+Après fusion, [run main 40757819354](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40757819354) :
+plan et publication réussis en 31 secondes, test et windows-package sautés. La préversion
+v0.2.6-preview.42 publie l'EXE de cette PR et son manifeste ; digest GitHub de l'asset
+identique au SHA-256 enregistré et vérifié avant publication. Aucun changement des
+fonctions de l'application ni besoin de réinstaller pour cette modification de CI.
