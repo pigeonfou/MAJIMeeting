@@ -38,7 +38,7 @@ def test_transcription_panel_selection_history_and_export(tmp_path):
     assert '00:01:01.250' in panel.text.toPlainText()
     assert 'track-01' in panel.text.toPlainText()
     panel.write_export('job', tmp_path / 'transcript.json')
-    assert json.loads((tmp_path / 'transcript.json').read_text())['segments'][0]['text'] == 'Décision technique.'
+    assert json.loads((tmp_path / 'transcript.json').read_text(encoding='utf-8'))['segments'][0]['text'] == 'Décision technique.'
     window.busy(True)
     assert not window.start_button.isEnabled()
     assert not panel.transcribe_button.isEnabled()
