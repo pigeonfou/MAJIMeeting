@@ -92,6 +92,7 @@ def test_editor_save_restore_export_and_background_excerpt(tmp_path):
     from majimeeting.__main__ import MainWindow
     app = QApplication.instance() or QApplication([])
     store, _ = prepared(tmp_path)
+    store.add_segment('job', 'track-00', 2.3, 2.4, 'Deuxième passage')
     window = MainWindow(store, scan=False)
     window.meetings.setCurrentRow(0)
     editor = TranscriptEditor(store, 'job', window)
@@ -111,10 +112,11 @@ def test_editor_save_restore_export_and_background_excerpt(tmp_path):
     assert 'François (track-00) : Décision corrigée' in (tmp_path / 'corrected.txt').read_text(encoding='utf-8')
     editor.play()
     assert not editor.listen.isEnabled()
-    editor.stop()  # Stop during preparation must prevent delayed playback.
+    editor.table.setCurrentCell(1, 0)  # Selecting elsewhere cancels delayed playback.
     assert editor.future.result(timeout=5) == .5
     editor.poll()
     assert editor.status.text() == 'Lecture arrêtée.'
+    editor.table.setCurrentCell(0, 0)
     editor.restore.click()
     assert store.segments('job')[0]['corrected_text'] == 'Original'
     assert store.segments('job')[0]['speaker'] == ''

@@ -110,6 +110,8 @@ class TranscriptEditor(QDialog):
         return self.rows[index] if 0 <= index < len(self.rows) else None
 
     def selected(self, *_):
+        if self.future is not None or self.player.playbackState() != QMediaPlayer.PlaybackState.StoppedState:
+            self.stop()
         row = self.current()
         for widget in (self.save, self.restore, self.speaker, self.text):
             widget.setEnabled(row is not None)
