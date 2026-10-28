@@ -158,7 +158,7 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   Les erreurs pendant l'itération des segments sont couvertes, sans duplication des
   résultats ni modification d'une tentative antérieure. Annuler ne relance pas le CPU.
 - Historique enrichi avec appareil/quantification effectifs et raison du repli.
-- Local : 41 tests réussis et Ruff réussi. Inférence réelle CPU et repli après DLL
+- Local : 42 tests réussis et Ruff réussi. Inférence réelle CPU et repli après DLL
   manquante simulée réussis avec le modèle tiny. CI et installateur Windows à contrôler.
 - Les DLL CUDA/cuDNN restent à installer séparément depuis NVIDIA si l'utilisateur veut
   activer le GPU. La reprise CPU n'est pas une validation de l'accélération RTX.

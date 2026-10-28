@@ -40,11 +40,17 @@ def prepare_cuda(extra=''):
             if key not in _REGISTERED:
                 _DLL_DIRECTORIES.append(os.add_dll_directory(str(directory)))
                 _REGISTERED.add(key)
-                # CTranslate2 also uses native LoadLibrary; process PATH is needed by that loader.
-                os.environ['PATH'] = str(directory) + os.pathsep + os.environ.get('PATH', '')
+        if directories:
+            # Preserve priority: the explicitly selected folder comes before auto-discovered ones.
+            known = {str(directory).lower() for directory in directories}
+            original = [entry for entry in os.environ.get('PATH', '').split(os.pathsep)
+                        if entry.lower() not in known]
+            os.environ['PATH'] = os.pathsep.join([str(d) for d in directories] + original)
         for library in ('cublasLt64_12.dll', 'cublas64_12.dll', 'cudnn64_9.dll'):
             try:
-                ctypes.WinDLL(library)
+                selected = next((directory / library for directory in directories
+                                 if (directory / library).is_file()), None)
+                ctypes.WinDLL(str(selected) if selected else library)
             except OSError as exc:
                 raise CudaUnavailableError(
                     f'{library} absente ou impossible à charger. CUDA nécessite cuBLAS CUDA 12 '

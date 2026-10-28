@@ -146,3 +146,31 @@ def test_missing_windows_dll_is_reported_before_cuda_engine_load(monkeypatch):
     with pytest.raises(CudaUnavailableError, match='cublasLt64_12.dll'):
         runtime.prepare_cuda()
     assert loaded == ['cublasLt64_12.dll']
+
+
+def test_selected_dll_directory_has_priority_and_does_not_grow_path(tmp_path, monkeypatch):
+    import os
+    import sys
+
+    import majimeeting.cuda_runtime as runtime
+    custom = tmp_path / 'selected'
+    automatic = tmp_path / 'automatic'
+    for folder in (custom, automatic):
+        folder.mkdir()
+        for name in ('cublasLt64_12.dll', 'cublas64_12.dll', 'cudnn64_9.dll'):
+            (folder / name).write_bytes(b'fake DLL for loader test')
+    monkeypatch.setattr(runtime.sys, 'platform', 'win32')
+    monkeypatch.setattr(runtime, 'cuda_directories', lambda extra: [custom, automatic])
+    monkeypatch.setattr(runtime, '_DLL_DIRECTORIES', [])
+    monkeypatch.setattr(runtime, '_REGISTERED', set())
+    monkeypatch.setattr(runtime.os, 'add_dll_directory', lambda path: object(), raising=False)
+    monkeypatch.setenv('PATH', str(automatic) + os.pathsep + 'original-path')
+    monkeypatch.setitem(sys.modules, 'ctranslate2', SimpleNamespace(get_cuda_device_count=lambda: 1))
+    loaded = []
+    monkeypatch.setattr(runtime.ctypes, 'WinDLL', loaded.append, raising=False)
+    runtime.prepare_cuda(str(custom))
+    first_path = os.environ['PATH']
+    runtime.prepare_cuda(str(custom))
+    assert os.environ['PATH'] == first_path
+    assert first_path.split(os.pathsep)[0] == str(custom)
+    assert all(str(custom) in library for library in loaded)
