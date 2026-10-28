@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
-$source = Join-Path $env:GITHUB_WORKSPACE 'vendor-ct2'
-$prefix = Join-Path $env:GITHUB_WORKSPACE 'ct2-install'
-$cuda = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8'
+$source = (Join-Path $env:GITHUB_WORKSPACE 'vendor-ct2').Replace('\', '/')
+$prefix = (Join-Path $env:GITHUB_WORKSPACE 'ct2-install').Replace('\', '/')
+$cuda = 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8'
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if (-not $vs) { throw 'MSVC toolchain missing' }

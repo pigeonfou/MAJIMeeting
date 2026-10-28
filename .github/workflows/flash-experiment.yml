@@ -31,8 +31,15 @@ jobs:
           path: vendor-ct2
           submodules: recursive
           persist-credentials: false
-      - name: Install CUDA compiler without a GPU driver
+      - name: Restore CUDA compiler cache
         if: steps.wheel.outputs.cache-hit != 'true'
+        id: cuda
+        uses: actions/cache/restore@v4
+        with:
+          path: C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8
+          key: cuda-sdk-12.8.1-win64-minimal-v1
+      - name: Install CUDA compiler without a GPU driver
+        if: steps.wheel.outputs.cache-hit != 'true' && steps.cuda.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -43,6 +50,12 @@ jobs:
           Remove-Item $installer
           & 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/bin/nvcc.exe' --version
           if ($LASTEXITCODE -ne 0) { throw 'CUDA compiler unavailable' }
+      - name: Save installed CUDA compiler before attempting compilation
+        if: steps.wheel.outputs.cache-hit != 'true' && steps.cuda.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8
+          key: cuda-sdk-12.8.1-win64-minimal-v1
       - name: Compile the Flash-enabled native engine and Python wheel
         if: steps.wheel.outputs.cache-hit != 'true'
         shell: pwsh

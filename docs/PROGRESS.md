@@ -483,3 +483,5 @@ stable restent à réaliser.
 - Les réunions et modèles sont partagés sous le verrou d'instance habituel. L'installateur
   expérimental utilise un AppId et un dossier distincts, sans remplacer la version normale.
 - Aucune release Flash déclarée fonctionnelle avant les résultats de compilation/tests.
+
+- Premier run [40770695390](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40770695390) : configuration CMake en échec sur le chemin CUDA Windows (échappement \\P). Chemins normalisés et cache SDK ajouté avant compilation ; nouvel essai requis. 78 tests locaux Python réussis avec le moteur standard, pas une validation du moteur Flash.
