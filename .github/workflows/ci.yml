@@ -1,12 +1,57 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      reuse: ${{ steps.approve.outputs.reuse || 'false' }}
+      source_run: ${{ steps.approve.outputs.source_run }}
+      manifest_digest: ${{ steps.approve.outputs.manifest_digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find an already validated installer
+        id: candidate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./.github/scripts/promotion.cjs').selectCandidate({github, context, core});
+      - name: Download the small source manifest
+        id: manifest
+        if: steps.candidate.outputs.candidate != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: MAJIMeeting-build-manifest
+          path: candidate-manifest
+          run-id: ${{ steps.candidate.outputs.candidate }}
+          github-token: ${{ github.token }}
+      - name: Verify the tested source tree matches the merge
+        id: approve
+        if: steps.manifest.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          SOURCE_RUN: ${{ steps.candidate.outputs.candidate }}
+          SOURCE_PR: ${{ steps.candidate.outputs.pr }}
+        with:
+          script: |
+            await require('./.github/scripts/promotion.cjs').approveCandidate({github, context, core,
+              directory: 'candidate-manifest', runId: process.env.SOURCE_RUN,
+              prNumber: process.env.SOURCE_PR});
   test:
+    needs: plan
+    if: needs.plan.outputs.reuse != 'true'
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -18,11 +63,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install Linux Qt runtime libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libpulse0
       - name: Install
         run: python -m pip install -e ".[dev]"
+      - name: Artifact promotion checks
+        run: node --test .github/scripts/promotion.test.cjs
       - name: Tests
         run: python -m pytest -q
       - name: Lint
@@ -40,19 +89,20 @@ jobs:
           HF_HUB_OFFLINE: '1'
         run: python -m majimeeting --inference-smoke test-model
   windows-package:
-    needs: test
+    needs: [plan, test]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.reuse != 'true' && needs.test.result == 'success'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install packaging dependencies
         run: python -m pip install . "pyinstaller>=6.11,<7"
       - name: Build Windows application
         run: python -m PyInstaller --noconfirm --clean --windowed --name MAJIMeeting --paths src --collect-all pyaudiowpatch --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all onnxruntime --collect-all tokenizers --collect-all huggingface_hub packaging/windows_entry.py
-      - name: Download tiny integration model (not shipped)
-        run: python -m majimeeting --download-smoke test-model
       - name: Smoke test packaged application
         shell: pwsh
         run: |
@@ -100,26 +150,73 @@ jobs:
             test-model-app/download.log
             test-model/download.log
           if-no-files-found: ignore
+      - name: Record the tested installer and source identity
+        run: python .github/scripts/build_manifest.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MAJIMeeting-build-manifest
+          path: dist/build-manifest.json
+          if-no-files-found: error
+          overwrite: true
       - uses: actions/upload-artifact@v4
         with:
           name: MAJIMeeting-Windows-preview
-          path: dist/MAJIMeeting-0.2.6-preview-Setup.exe
+          path: |
+            dist/MAJIMeeting-0.2.6-preview-Setup.exe
+            dist/build-manifest.json
           if-no-files-found: error
+          overwrite: true
   preview-release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: windows-package
+    if: >-
+      always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      needs.plan.result == 'success' &&
+      (needs.plan.outputs.reuse == 'true' || needs.windows-package.result == 'success')
+    needs: [plan, windows-package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: MAJIMeeting-Windows-preview
           path: release-assets
-      - name: Publish tested installer as prerelease
+          run-id: ${{ needs.plan.outputs.reuse == 'true' && needs.plan.outputs.source_run || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify installer bytes and provenance before publishing
+        id: bundle
+        uses: actions/github-script@v7
+        env:
+          EXPECTED_RUN: ${{ needs.plan.outputs.reuse == 'true' && needs.plan.outputs.source_run || github.run_id }}
+          MANIFEST_DIGEST: ${{ needs.plan.outputs.manifest_digest }}
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const commit = await github.rest.git.getCommit({owner, repo, commit_sha: context.sha});
+            const m = require('./.github/scripts/promotion.cjs').verifyBundle('release-assets', {
+              repository: `${owner}/${repo}`, runId: process.env.EXPECTED_RUN,
+              manifestDigest: process.env.MANIFEST_DIGEST, targetTree: commit.data.tree.sha});
+            core.setOutput('tag', `v${m.version}-preview.${m.run_number}`);
+            core.setOutput('installer', m.installer);
+            core.setOutput('sha256', m.sha256);
+            core.setOutput('source_run', String(m.run_id));
+      - name: Publish exactly the tested installer
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v0.2.6-preview.${{ github.run_number }}
+          RELEASE_TAG: ${{ steps.bundle.outputs.tag }}
+          INSTALLER_FILE: ${{ steps.bundle.outputs.installer }}
+          INSTALLER_SHA256: ${{ steps.bundle.outputs.sha256 }}
+          SOURCE_RUN: ${{ steps.bundle.outputs.source_run }}
         run: |
-          gh release create "$RELEASE_TAG" release-assets/*.exe --target "$GITHUB_SHA" --prerelease --title "MAJIMeeting $RELEASE_TAG — essais GPU avancés" --notes-file docs/RELEASE_PREVIEW.md
+          if gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            existing_target=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
+            test "$existing_target" = "$GITHUB_SHA"
+            mkdir existing-release
+            gh release download "$RELEASE_TAG" --pattern "$INSTALLER_FILE" --dir existing-release
+            printf '%s  %s\n' "$INSTALLER_SHA256" "existing-release/$INSTALLER_FILE" | sha256sum --check
+          else
+            cp docs/RELEASE_PREVIEW.md release-notes.md
+            printf '\nInstallateur validé : https://github.com/%s/actions/runs/%s\nSHA-256 : %s\n' "$GITHUB_REPOSITORY" "$SOURCE_RUN" "$INSTALLER_SHA256" >> release-notes.md
+            gh release create "$RELEASE_TAG" "release-assets/$INSTALLER_FILE" release-assets/build-manifest.json --target "$GITHUB_SHA" --prerelease --title "MAJIMeeting $RELEASE_TAG" --notes-file release-notes.md
+          fi
