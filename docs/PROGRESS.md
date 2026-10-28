@@ -3,7 +3,9 @@
 Mise à jour : 28 octobre 2026.
 
 ## État global
-Jalon 1 en cours. Prototype de capture Windows ; aucune release stable validée.
+Jalon 2 en cours, sur accord utilisateur après les essais de capture réussis.
+Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
+conservés à réaliser. Aucune release stable validée.
 Le socle initial au commit `32caf8a` a été intégralement relu (neuf fichiers).
 La branche `develop/recording-foundation` existante a été reprise sans réinitialisation.
 
@@ -21,8 +23,9 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   essai d'installation et démarrage du binaire installé, artefact téléchargeable.
 
 ## Jalons
-- En cours : J1 enregistrement et validation matérielle.
-- À réaliser : J2 transcription ; J3 diarisation/éditeur ; J4 comptes rendus ;
+- Réalisé avec validation partielle : J1 enregistrement ; essais complémentaires à réaliser.
+- En cours : J2 import audio et transcription locale horodatée.
+- À réaliser : J3 diarisation/éditeur ; J4 comptes rendus ;
   J5 exports documentaires/sauvegardes ; J6 validation complète et release stable.
 
 ## Tests exécutés
@@ -38,7 +41,22 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   Sous Windows et Linux : 12 tests, Ruff et démarrage Qt réussis. Construction Windows,
   démarrage du binaire empaqueté, compilation Inno Setup, installation silencieuse et
   démarrage du programme installé réussis. Publication de la préversion réussie.
-- Capture matérielle WASAPI, réunions longues et RTX : non testées dans cet environnement.
+- Retour utilisateur du 28 octobre 2026, sur la préversion v0.1.0-preview.9 :
+  sélection microphone + loopback OK ; capture d'au moins deux minutes, silence inclus,
+  interface réactive OK ; export/écoute des deux pistes distinctes, durée et intelligibilité OK ;
+  arrêt forcé et récupération/export des fragments OK.
+- À réaliser : débranchement, réunion longue, mesure de dérive/charge, fonctionnement sans
+  réseau, désinstallation/conservation des données. Ces essais n'ont pas été déclarés réussis.
+- Matériel confirmé par capture utilisateur : Windows x64, Intel i7-11800H,
+  32 Go RAM et RTX 3080 Laptop 16 Go. Aucun identifiant matériel personnel conservé ici.
+- J2 local Linux Python 3.12 : 25 tests réussis, Ruff et démarrage Qt offscreen réussis.
+  Import réel WAV/MP3/FLAC/M4A testé ; moteur simulé pour les tests de persistance,
+  annulation, horodatage et absence de téléchargement implicite.
+- Inférence locale avec vrais poids tiny en CPU/int8, VAD et chaîne import/transcription
+  avec HF_HUB_OFFLINE=1 : réussie. Incompatibilité PyAV 19/faster-whisper détectée puis
+  corrigée par une contrainte av<16 ; résultat réussi avec PyAV 15.1.0.
+- CI Windows/Linux et installateur J2 : à contrôler.
+- Qualité de transcription large-v3 et exécution CUDA sur RTX : à réaliser.
 
 ## Limites connues
 - Une coupure brutale perd les données non encore finalisées (tampon, file et fragment
@@ -50,14 +68,23 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   restent exportables. Pas de reprise automatique d'un périphérique débranché.
 - Export WAV classique limité à 4 Go ; conserver les fragments pour les très longues pistes.
 - Test de démarrage/installation en CI sans matériel audio : ne valide pas la capture réelle.
-- Prototype sans signature de code, sans modèles IA ni fonctions des jalons 2 à 5.
+- J2 : import local et transcription différée intégrés ; modèle large-v3 téléchargé séparément
+  depuis le bouton dédié. Inférence exclusivement locale, CPU int8/float32 ou CUDA
+  int8_float16/float16. Bibliothèques CUDA non incluses dans l'installateur.
+- Transcription par lots audio de cinq minutes, pistes traitées successivement ; frontière
+  de lot sans recouvrement, à évaluer sur la qualité des mots à la jonction.
+- Annulation coopérative : attend le chargement modèle ou la fin du segment en cours.
+  Téléchargement des poids non annulable dans l'interface ; téléchargement reprenable au relancement.
+- Les imports conservent l'original et décodent la première piste audio en mono 16 kHz.
+- Aucun locuteur identifié : les noms track-XX désignent des sources, pas des personnes.
+  Pas encore de diarisation, lecture synchronisée, correction ni compte rendu.
+- Prototype sans signature de code ; aucune validation large-v3/CUDA à ce stade.
 
 ## Prochaines actions
-1. Télécharger et installer la préversion pour les essais matériels Windows.
-2. Tester microphone + loopback, silence système, débranchement, fermeture forcée,
-   puis une réunion longue sur Windows (voir WINDOWS_TESTS.md).
-3. Mesurer décalage/dérive et charge disque ; décider du mécanisme de synchronisation.
-4. Finaliser J1 avant intégration du traitement différé faster-whisper.
+1. Valider la CI et l'installateur J2 avec une inférence CPU réelle hors ligne.
+2. Tester large-v3 sur audio français représentatif, en CPU puis sur RTX/CUDA.
+3. Réaliser ultérieurement les essais J1 restants, sans bloquer J2 à la demande utilisateur.
+4. Évaluer les frontières de lots et la dérive des sources avant diarisation/éditeur (J3).
 
 ## Références
 - Base : `32caf8a0512db0a9629c5e53756630edc64917c9`.
@@ -65,4 +92,4 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Implémentation : `84becbb` ; tests/CI : `6731a18` ; publication : `bef068c`.
 - Fusion main : `fcd1cd8f5fb47a4f62ba901ce81f58ecc7b11a35`.
 - [Préversion v0.1.0-preview.9](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.1.0-preview.9) : installateur disponible, 28 octobre 2026.
-- Aucune release stable publiée ; essais audio matériels toujours en attente.
+- Aucune release stable publiée ; essais audio matériels complémentaires toujours à réaliser.

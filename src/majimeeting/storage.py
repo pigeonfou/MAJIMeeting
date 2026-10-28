@@ -17,6 +17,13 @@ class MeetingStore:
             db.execute("""CREATE TABLE IF NOT EXISTS meetings (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL, created TEXT NOT NULL,
                 status TEXT NOT NULL, error TEXT NOT NULL DEFAULT '')""")
+            db.execute("""CREATE TABLE IF NOT EXISTS transcription_jobs (
+                id TEXT PRIMARY KEY, meeting_id TEXT NOT NULL, created TEXT NOT NULL,
+                status TEXT NOT NULL, options TEXT NOT NULL, error TEXT NOT NULL DEFAULT '')""")
+            db.execute("""CREATE TABLE IF NOT EXISTS transcript_segments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT NOT NULL,
+                track TEXT NOT NULL, start REAL NOT NULL, end REAL NOT NULL, text TEXT NOT NULL)""")
+            db.execute("CREATE INDEX IF NOT EXISTS segments_job ON transcript_segments(job_id)")
 
     @contextmanager
     def connect(self):
@@ -51,7 +58,36 @@ class MeetingStore:
         with self.connect() as db:
             result = db.execute("UPDATE meetings SET status='interrupted' "
                                 "WHERE status='recording'")
+            db.execute("UPDATE transcription_jobs SET status='interrupted' WHERE status='running'")
             return result.rowcount
+
+    def start_transcription(self, job, meeting_id, options):
+        from dataclasses import asdict
+        with self.connect() as db:
+            if not db.execute("SELECT 1 FROM meetings WHERE id=?", (meeting_id,)).fetchone():
+                raise ValueError('Réunion introuvable.')
+            db.execute("INSERT INTO transcription_jobs VALUES (?, ?, ?, 'running', ?, '')",
+                       (job, meeting_id, datetime.now(UTC).isoformat(), json.dumps(asdict(options))))
+
+    def add_segment(self, job, track, start, end, text):
+        with self.connect() as db:
+            db.execute("INSERT INTO transcript_segments(job_id,track,start,end,text) "
+                       "VALUES (?, ?, ?, ?, ?)", (job, track, start, end, text))
+
+    def finish_transcription(self, job, state, error=''):
+        with self.connect() as db:
+            db.execute("UPDATE transcription_jobs SET status=?,error=? WHERE id=?",
+                       (state, error, job))
+
+    def transcription_jobs(self, meeting_id):
+        with self.connect() as db:
+            return db.execute("SELECT * FROM transcription_jobs WHERE meeting_id=? "
+                              "ORDER BY rowid DESC", (meeting_id,)).fetchall()
+
+    def segments(self, job):
+        with self.connect() as db:
+            return db.execute("SELECT * FROM transcript_segments WHERE job_id=? "
+                              "ORDER BY start,track,id", (job,)).fetchall()
 
     def list(self):
         with self.connect() as db:

@@ -1,5 +1,22 @@
 # Validation du prototype Windows
 
+## Résultats utilisateur — 28 octobre 2026
+
+| Essai | État |
+| --- | --- |
+| Sélection du microphone et de la sortie système | Réussi |
+| Capture ≥ 2 minutes, silence et interface réactive | Réussi |
+| Export et écoute des deux pistes, durée et intelligibilité | Réussi |
+| Arrêt forcé, redémarrage et export des fragments récupérés | Réussi |
+| Débranchement du microphone | À réaliser |
+| Réunion longue, charge mémoire/CPU/disque et dérive | À réaliser |
+| Capture et export sans réseau | À réaliser |
+| Désinstallation et conservation des réunions | À réaliser |
+
+L'utilisateur demande de poursuivre J2 avec ces essais complémentaires encore ouverts.
+
+## Protocole
+
 Le build automatisé ne peut pas valider votre matériel audio. Ces essais ne nécessitent
 pas encore le GPU ni l'installation des modèles.
 

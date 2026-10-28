@@ -1,6 +1,6 @@
 # Feuille de route
 
-- [ ] J1 : capture audio Windows fiable, stockage et reprise après interruption.
+- [ ] J1 (socle validé partiellement, essais complémentaires à réaliser) : capture audio Windows fiable, stockage et reprise après interruption.
 - [ ] J2 : import audio, Whisper et transcription horodatée.
 - [ ] J3 : diarisation, identification manuelle et éditeur synchronisé.
 - [ ] J4 : génération locale de rapports, actions et décisions sourcées.
