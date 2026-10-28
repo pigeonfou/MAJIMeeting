@@ -17,11 +17,22 @@ python -m pip install 'cmake>=3.28,<4' ninja 'pybind11==2.13.6' setuptools wheel
 if ($LASTEXITCODE -ne 0) { throw 'Build dependencies failed' }
 python packaging/flash/prepare_source.py $source
 if ($LASTEXITCODE -ne 0) { throw 'Source preparation failed' }
-cmake -S $source -B ct2-build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$prefix" -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DBUILD_CLI=OFF -DWITH_CUDA=ON -DWITH_CUDNN=OFF -DWITH_MKL=OFF -DWITH_DNNL=OFF -DWITH_RUY=ON -DOPENMP_RUNTIME=COMP -DWITH_FLASH_ATTN=ON -DCUDA_DYNAMIC_LOADING=ON -DCUDA_USE_STATIC_CUDA_RUNTIME=ON "-DCUDA_TOOLKIT_ROOT_DIR=$cuda" -DCUDA_ARCH_LIST=8.6 '-DCUDA_NVCC_FLAGS=-Xfatbin=-compress-all;-allow-unsupported-compiler'
+$cmakeArguments = @(
+    '-S', $source, '-B', 'ct2-build', '-G', 'Ninja',
+    '-DCMAKE_BUILD_TYPE=Release', "-DCMAKE_INSTALL_PREFIX=$prefix",
+    '-DCMAKE_POLICY_VERSION_MINIMUM=3.5', '-DBUILD_CLI=OFF',
+    '-DWITH_CUDA=ON', '-DWITH_CUDNN=OFF', '-DWITH_MKL=OFF', '-DWITH_DNNL=OFF',
+    '-DWITH_RUY=ON', '-DOPENMP_RUNTIME=COMP', '-DWITH_FLASH_ATTN=ON',
+    '-DCUDA_DYNAMIC_LOADING=ON', '-DCUDA_USE_STATIC_CUDA_RUNTIME=ON',
+    "-DCUDA_TOOLKIT_ROOT_DIR=$cuda", '-DCUDA_ARCH_LIST:STRING=8.6',
+    '-DCUDA_NVCC_FLAGS=-Xfatbin=-compress-all;-allow-unsupported-compiler'
+)
+& cmake @cmakeArguments
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
 cmake --build ct2-build --target install --parallel 2
 if ($LASTEXITCODE -ne 0) { throw 'Native compilation failed' }
 $cache = Get-Content ct2-build/CMakeCache.txt -Raw
+if ($cache -notmatch 'CUDA_ARCH_LIST:STRING=8[.]6') { throw 'Wrong GPU architecture in cache' }
 if ($cache -notmatch 'WITH_FLASH_ATTN:BOOL=ON') { throw 'Flash build flag missing' }
 Copy-Item "$prefix/bin/ctranslate2.dll" "$source/python/ctranslate2/"
 Copy-Item "$source/README.md" "$source/python/"

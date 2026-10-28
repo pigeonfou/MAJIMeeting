@@ -485,3 +485,5 @@ stable restent à réaliser.
 - Aucune release Flash déclarée fonctionnelle avant les résultats de compilation/tests.
 
 - Premier run [40770695390](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40770695390) : configuration CMake en échec sur le chemin CUDA Windows (échappement \\P). Chemins normalisés et cache SDK ajouté avant compilation ; nouvel essai requis. 78 tests locaux Python réussis avec le moteur standard, pas une validation du moteur Flash.
+
+- Deuxième run [40771641842](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40771641842) : CUDA trouvé, mais architecture reçue comme 8 au lieu de 8.6 par CMake. Arguments transmis comme tableau de chaînes explicites, architecture typée STRING et contrôle du cache ajoutés. SDK CUDA désormais en cache. Troisième essai requis.
