@@ -296,3 +296,40 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Prochain essai utilisateur : même réunion, CUDA et quantification identiques, comparer
   séquentiel puis lots de 8 en Qualité ; vérifier durée et passages. Rapide et float16 à
   comparer séparément. Les métriques ne certifient pas l'exactitude du texte reconnu.
+
+
+## Revalidation 0.2.5 et mesures RTX fournies par l'utilisateur
+
+Le 28 octobre 2026, nouvelles captures de la même durée source : 1504,4 secondes-pistes.
+Réglages CUDA et profil relevés dans l'historique effectif, traitements terminés en une
+tentative, sans repli CPU visible.
+
+| Calcul effectif | Profil | Total (s) | Chargement (s) | Inférence/VAD (s) | Ajustements / rejets |
+|---|---|---:|---:|---:|---|
+| int8_float16, séquentiel | Qualité, beam 5 | 166,7 | 10,5 | 154,0 | 1 / 0 |
+| int8_float16, lots 8 | Qualité, beam 5 | 92,6 | 11,6 | 74,2 | 2 / 0 |
+| int8_float16, lots 16 | Qualité, beam 5 | 88,1 | 16,1 | 70,2 | 1 / 0 |
+| float16, lots 16 | Qualité, beam 5 | 77,4 | 7,3 | 68,2 | 1 / 0 |
+| float16, lots 16 | Rapide, beam 1 | 43,2 | 6,2 | 35,1 | 2 / 0 |
+
+Mesures observées sur les captures utilisateur, non reproduites sur une RTX dans notre
+environnement. Un seul résultat relevé par configuration ; variations de chargement et
+de contexte non contrôlées. La comparaison n'est pas un score de qualité du français.
+Le résultat le plus rapide représente environ 74 % de temps total en moins que le
+séquentiel relevé ; vérifier texte et avertissements avant de le retenir par défaut.
+
+À la demande de retest de la version actuelle :
+- 21 fichiers source/tests/configuration comparés aux empreintes GitHub de main
+  `36492c287cca45f572351d017de1cc855fdff3d3` : aucune différence.
+- Revalidation locale Linux : 70 tests réussis, Ruff réussi, démarrage Qt et test de
+  l'éditeur/décodage WAV Qt réussis.
+- Nouveau téléchargement réel tiny avec contrôle d'intégrité réussi ; inférence CPU
+  hors ligne, lot réel de deux requêtes, VAD et chaîne de production réussis.
+- CI Windows/Linux de référence
+  [40735297009](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40735297009)
+  revérifiée : succès sur `6a7fd68216f7a07b2f3d3ba5596eb3d2d2e1fdde`.
+  Cette consultation ne constitue pas une nouvelle exécution Windows.
+- CTranslate2 détecte zéro GPU CUDA ici. Aucun test Flash Attention ni de concurrence
+  à deux workers GPU réalisé. Ces pistes ne sont pas intégrées dans 0.2.5.
+- Aucun code ni installateur modifié pour cette revalidation. Les autres essais matériels
+  reportés gardent leur statut.
