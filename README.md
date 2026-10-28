@@ -10,7 +10,7 @@ Application Windows locale de capture, transcription multi-interlocuteurs et ré
 - Traçabilité des décisions vers les passages horodatés.
 - Export PDF, DOCX, Markdown et TXT.
 
-**Statut :** jalon 1 en développement. Prototype d'enregistrement ; aucune release stable validée.
+**Statut :** jalon 2 en validation. Capture partiellement validée sur matériel et transcription locale intégrée ; aucune release stable validée.
 
 ## Développement
 Python 3.11+, PySide6, SQLite. Installation de développement :
@@ -34,7 +34,7 @@ exportables. Les données sont dans `%LOCALAPPDATA%\MAJIMeeting\data`.
 
 La CI construit un installateur Windows de préversion et vérifie son installation et son
 démarrage. Il est fourni comme artefact de workflow ; cela ne valide pas les périphériques
-physiques. Aucun modèle IA n'est encore intégré. L'application fonctionne localement.
+physiques. Les modèles sont téléchargés séparément depuis l'onglet de transcription. L'application fonctionne localement.
 
 Voir [la progression](docs/PROGRESS.md) et [les essais Windows](docs/WINDOWS_TESTS.md).
 

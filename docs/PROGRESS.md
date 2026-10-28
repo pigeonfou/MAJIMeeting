@@ -22,6 +22,12 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - CI Linux/Windows, démarrage Qt, construction PyInstaller et installateur Inno Setup,
   essai d'installation et démarrage du binaire installé, artefact téléchargeable.
 
+- J2 : import WAV/MP3/FLAC/M4A en streaming, conservation de l'original.
+- J2 : transcription française locale faster-whisper par lots bornés, choix CPU/CUDA
+  et quantification, modèle large-v3 via téléchargement explicite ou dossier local.
+- J2 : historique des tentatives, sauvegarde incrémentale des segments horodatés,
+  annulation coopérative, récupération de l'état après arrêt forcé et exports TXT/JSON.
+
 ## Jalons
 - Réalisé avec validation partielle : J1 enregistrement ; essais complémentaires à réaliser.
 - En cours : J2 import audio et transcription locale horodatée.
@@ -55,7 +61,11 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Inférence locale avec vrais poids tiny en CPU/int8, VAD et chaîne import/transcription
   avec HF_HUB_OFFLINE=1 : réussie. Incompatibilité PyAV 19/faster-whisper détectée puis
   corrigée par une contrainte av<16 ; résultat réussi avec PyAV 15.1.0.
-- CI Windows/Linux et installateur J2 : à contrôler.
+- CI J2 de la [PR nº 2](https://github.com/pigeonfou/MAJIMeeting/pull/2) réussie :
+  [run 40683437589](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40683437589).
+  25 tests sur Windows et Linux ; inférence CPU réelle et VAD hors ligne réussis ;
+  construction, installation et inférence du programme Windows installé réussies.
+  Premier passage Windows : test d’export corrigé pour relire explicitement UTF-8.
 - Qualité de transcription large-v3 et exécution CUDA sur RTX : à réaliser.
 
 ## Limites connues
@@ -81,7 +91,7 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Prototype sans signature de code ; aucune validation large-v3/CUDA à ce stade.
 
 ## Prochaines actions
-1. Valider la CI et l'installateur J2 avec une inférence CPU réelle hors ligne.
+1. Installer la préversion J2 et télécharger large-v3 pour les essais utilisateur.
 2. Tester large-v3 sur audio français représentatif, en CPU puis sur RTX/CUDA.
 3. Réaliser ultérieurement les essais J1 restants, sans bloquer J2 à la demande utilisateur.
 4. Évaluer les frontières de lots et la dérive des sources avant diarisation/éditeur (J3).
@@ -93,3 +103,17 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Fusion main : `fcd1cd8f5fb47a4f62ba901ce81f58ecc7b11a35`.
 - [Préversion v0.1.0-preview.9](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.1.0-preview.9) : installateur disponible, 28 octobre 2026.
 - Aucune release stable publiée ; essais audio matériels complémentaires toujours à réaliser.
+
+## Références du jalon 2
+
+- [PR nº 2](https://github.com/pigeonfou/MAJIMeeting/pull/2) fusionnée.
+- Implémentation : `1ce4ccf` ; correction du test UTF-8 Windows : `0d8e9de`.
+- Fusion : `1440a1af995acf168603d4271a42bf39f4212c71`.
+- [CI main J2](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40684183125) réussie :
+  25 tests par système, Ruff, interface Qt, inférence CPU réelle/VAD hors ligne ;
+  construction et installation Windows, puis inférence dans le programme installé réussies.
+- [Préversion v0.2.0-preview.14](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.0-preview.14)
+  publiée le 28 octobre 2026. Poids de large-v3 à télécharger séparément.
+- Le jalon 2 reste en validation utilisateur : qualité française large-v3, CUDA/RTX,
+  longues réunions et frontières de lots encore à vérifier. Les essais J1 restants
+  demeurent « à réaliser » ; ils ne sont pas assimilés à des succès.

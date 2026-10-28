@@ -25,3 +25,16 @@ Meeting -> AudioTrack ; Meeting -> Speaker ; Meeting -> Segment (start/end/text/
 ## Décisions à valider par des essais
 Compatibilité CUDA/CTranslate2/pyannote sur Windows ; consommation mémoire ; qualité WER/DER sur français technique ; capture simultanée microphone et loopback ; packaging PyInstaller.
 
+
+## Implémentation des jalons 1 et 2
+
+- `storage.py` : catalogue SQLite, jobs de transcription, segments horodatés et fragments WAV atomiques.
+- `capture.py` : WASAPI, callbacks vers une file bornée et worker d'écriture indépendant de Qt.
+- `transcription.py` : import PyAV en streaming, assemblage de lots audio bornés,
+  chargement exclusif d'un modèle local et sauvegarde au fil des segments.
+- `processing_ui.py` : import, choix du modèle/calcul, historique et exports de transcription.
+- `selftest.py` : contrôle d'intégration CPU avec vrais poids, import et VAD sans accès au Hub.
+
+Les tâches différées partagent un worker série ; aucun modèle n'est chargé pendant la
+capture. La diarisation et la synthèse devront conserver cette exclusivité des modèles.
+La base est enrichie par des créations de tables additives, sans suppression des réunions existantes.
