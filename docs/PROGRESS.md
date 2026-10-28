@@ -131,5 +131,19 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Local : 33 tests réussis, Ruff réussi ; vrai téléchargement tiny avec contrôle d'intégrité
   réussi et inférence CPU hors ligne avec les fichiers téléchargés réussie.
 - CI : téléchargement réel depuis l'exécutable installé ajouté, puis inférence hors ligne.
-  Résultats et release du correctif à consigner après exécution.
+  CI et publication réussies ; références ci-dessous.
 - Les autres essais matériels précédemment marqués à réaliser conservent ce statut.
+
+## Références du correctif 0.2.1
+
+- [PR nº 3](https://github.com/pigeonfou/MAJIMeeting/pull/3) fusionnée.
+- Implémentation : `638e9647b1eff4b0ea1d9ada8e63f2a6463da18e` ; fusion : `7fdddbbc4bf9fdb6a6ca6abaee68cdd06787cd33`.
+- [CI de la PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40692971389) et
+  [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40693974286) réussies.
+- 33 tests sur Windows et Linux, Ruff, démarrage Qt, téléchargement tiny réel avec
+  vérification d'intégrité et inférence CPU hors ligne réussis.
+- Installation Windows, téléchargement réel par l'exécutable installé puis inférence
+  hors ligne avec les mêmes fichiers réussis. Journaux de téléchargement conservés en artefacts CI.
+- [Préversion v0.2.1-preview.17](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.1-preview.17) publiée le 28 octobre 2026.
+- À confirmer sur le PC utilisateur : téléchargement complet large-v3 avec ce correctif.
+  Le signalement initial n'est pas déclaré résolu sur son matériel sans son retour.
