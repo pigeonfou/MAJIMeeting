@@ -51,3 +51,20 @@ noms d'intervenants ; la diarisation et les corrections appartiennent au jalon 3
 La CI utilise un petit modèle `tiny` pour une véritable inférence CPU, le VAD et le
 chemin import/transcription sans réseau. Ce test ne mesure pas la qualité de large-v3,
 la précision du français, la VRAM ni la compatibilité CUDA sur votre matériel.
+
+## Téléchargement corrigé — 0.2.1
+
+Le bouton affiche désormais connexion, fichier en cours, Mo reçus, pourcentage et contrôle
+ d'intégrité. La connexion et chaque lecture réseau utilisent des délais de 10 et 15 secondes
+ respectivement (sans boucle de réessai infinie). Le bouton Annuler arrête au prochain bloc
+ ou après la fin de l'attente réseau en cours. Les fichiers `.part` sont conservés et repris
+ au prochain clic si leurs métadonnées correspondent au modèle demandé.
+
+Les téléchargements utilisent HTTPS directement, sans charger le moteur d'inférence ni
+ les barres de progression console du SDK. Tous les fichiers sont contrôlés par empreinte
+ avant remplacement ; les fichiers déjà complets et vérifiés sont conservés.
+ Le fichier `download.log` dans le dossier du modèle contient le diagnostic local.
+
+Le test Windows installé télécharge réellement un modèle tiny via ce même composant,
+ puis lance l'inférence avec ce dossier en mode hors ligne. Il ne télécharge pas les 3 Go
+ de large-v3 dans la CI. Les essais utilisateur large-v3/CUDA restent nécessaires.

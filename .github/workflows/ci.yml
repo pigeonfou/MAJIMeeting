@@ -30,7 +30,7 @@ jobs:
       - name: GUI startup smoke test
         run: python -m majimeeting --smoke-test
       - name: Download tiny integration model (not shipped)
-        run: python -c "from faster_whisper.utils import download_model; download_model('tiny', output_dir='test-model')"
+        run: python -m majimeeting --download-smoke test-model
       - name: Real CPU inference, import and VAD offline
         env:
           HF_HUB_OFFLINE: '1'
@@ -48,7 +48,7 @@ jobs:
       - name: Build Windows application
         run: python -m PyInstaller --noconfirm --clean --windowed --name MAJIMeeting --paths src --collect-all pyaudiowpatch --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all onnxruntime --collect-all tokenizers --collect-all huggingface_hub packaging/windows_entry.py
       - name: Download tiny integration model (not shipped)
-        run: python -c "from faster_whisper.utils import download_model; download_model('tiny', output_dir='test-model')"
+        run: python -m majimeeting --download-smoke test-model
       - name: Smoke test packaged application
         shell: pwsh
         run: |
@@ -69,20 +69,33 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-installed'
-          $setup = Start-Process dist/MAJIMeeting-0.2.0-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          $setup = Start-Process dist/MAJIMeeting-0.2.1-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installation failed: $($setup.ExitCode)" }
           $app = Start-Process "$target/MAJIMeeting.exe" -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(30000)) { $app.Kill(); throw 'Installed app timeout' }
           if ($app.ExitCode -ne 0) { throw "Installed app failed: $($app.ExitCode)" }
+          $downloadPath = Join-Path $env:GITHUB_WORKSPACE 'test-model-app'
+          $download = Start-Process "$target/MAJIMeeting.exe" -ArgumentList @('--download-smoke', $downloadPath) -PassThru
+          if (-not $download.WaitForExit(240000)) { $download.Kill(); throw 'Installed model download timeout' }
+          if ($download.ExitCode -ne 0) { throw "Installed model download failed: $($download.ExitCode)" }
           $env:HF_HUB_OFFLINE = '1'
-          $model = (Resolve-Path test-model).Path
+          $model = (Resolve-Path test-model-app).Path
           $inference = Start-Process "$target/MAJIMeeting.exe" -ArgumentList @('--inference-smoke', $model) -PassThru
           if (-not $inference.WaitForExit(180000)) { $inference.Kill(); throw 'Installed inference timeout' }
           if ($inference.ExitCode -ne 0) { throw "Installed inference failed: $($inference.ExitCode)" }
+      - name: Upload model download diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-download-diagnostics
+          path: |
+            test-model-app/download.log
+            test-model/download.log
+          if-no-files-found: ignore
       - uses: actions/upload-artifact@v4
         with:
           name: MAJIMeeting-Windows-preview
-          path: dist/MAJIMeeting-0.2.0-preview-Setup.exe
+          path: dist/MAJIMeeting-0.2.1-preview-Setup.exe
           if-no-files-found: error
   preview-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -99,6 +112,6 @@ jobs:
       - name: Publish tested installer as prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v0.2.0-preview.${{ github.run_number }}
+          RELEASE_TAG: v0.2.1-preview.${{ github.run_number }}
         run: |
           gh release create "$RELEASE_TAG" release-assets/*.exe --target "$GITHUB_SHA" --prerelease --title "MAJIMeeting $RELEASE_TAG — prototype transcription locale" --notes-file docs/RELEASE_PREVIEW.md
