@@ -466,3 +466,13 @@ installateur requis pour consigner ce retour. Réglages déjà mémorisés par l
 Prochaine fonctionnalité : suite du jalon 3, diarisation automatique Community-1 et
 correction des locuteurs détectés. Les essais J1 reportés et les conditions de release
 stable restent à réaliser.
+
+
+## Tentative Flash Attention native Windows en cours
+
+- Accord utilisateur du 28 octobre 2026 pour essayer une compilation personnalisée.
+- Sources et workflow isolés dans [experiment/windows-flash](https://github.com/pigeonfou/MAJIMeeting/tree/experiment/windows-flash), sans remplacement de la distribution normale.
+- Premier run [40770695390](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40770695390) : configuration CMake en échec sur l'échappement du chemin Windows CUDA. Chemins normalisés dans `1df067293da8a9ffa558a5f7e31a099dbf83e382` et cache du compilateur ajouté.
+- Deuxième run [40771641842](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40771641842) : compilation native en cours au moment de cette note. Aucun moteur Flash ni installateur expérimental déclaré fonctionnel.
+- CTranslate2 4.8.4 fixé au commit `5de572ef60b67a0276c5989ee73d0072808ff4c3`, CUDA 12.8.1, architecture 8.6, WITH_FLASH_ATTN=ON, CPU RUY. Sonde native ajoutée pour lire le flag réel de la DLL, sans modifier les kernels d'attention.
+- 78 tests locaux avec le moteur standard réussis, Ruff et préparation des sources réussis. Les tests du moteur personnalisé, de son empaquetage et les essais sur RTX restent à réaliser.
