@@ -494,3 +494,10 @@ stable restent à réaliser.
 - Run 40772586388 : job natif annulé après environ 45 minutes, durée correspondant à sa limite ; tests Windows et release sautés. Cause exacte non confirmée, récupération des logs en erreur de transport.
 - Nouvelle tentative : limite portée à 180 minutes et sortie de compilation enregistrée dans `flash-native-build.log`, jointe aux diagnostics même en cas d'échec.
 - Aucun moteur Flash ni installateur expérimental validé à ce stade. Version normale inchangée ; validation GPU RTX 3080 toujours à réaliser.
+
+
+## Diagnostic du démarrage Flash installé
+
+- Run 40779226342 : compilation native réussie, sonde Flash native et tests applicatifs/lint réussis ; inférence CPU réelle réussie. EXE et installateur construits.
+- Contrôle installé : sonde native réussie, `--smoke-test` interrompu après 30 secondes. Aucune release publiée ; GPU non testé.
+- Ajout d'un journal de démarrage persistant et capture des exceptions avant la boîte de dialogue PyInstaller ; nouvelle exécution pour identifier la cause du blocage.

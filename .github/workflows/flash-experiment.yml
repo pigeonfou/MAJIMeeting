@@ -131,6 +131,7 @@ jobs:
           $setup = Start-Process dist/MAJIMeeting-0.2.6-Flash-Experimental-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw 'Experimental installation failed' }
           $env:HF_HUB_OFFLINE = '1'
+          $env:MAJIMEETING_DIAGNOSTIC_LOG = Join-Path $env:GITHUB_WORKSPACE 'flash-startup.log'
           $app = Join-Path $target 'MAJIMeeting-Flash.exe'
           foreach ($flag in @('--flash-build-check', '--smoke-test', '--editor-smoke')) {
             $check = Start-Process $app -ArgumentList $flag -PassThru
@@ -141,6 +142,13 @@ jobs:
           $check = Start-Process $app -ArgumentList @('--inference-smoke', $model) -PassThru
           if (-not $check.WaitForExit(240000)) { $check.Kill(); throw 'Installed inference timeout' }
           if ($check.ExitCode -ne 0) { throw 'Installed inference failed' }
+      - name: Installed application diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Flash-startup-diagnostics
+          path: flash-startup.log
+          if-no-files-found: ignore
       - name: Record installer integrity
         shell: pwsh
         run: |
