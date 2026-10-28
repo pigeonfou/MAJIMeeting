@@ -29,7 +29,7 @@ $cmakeArguments = @(
 )
 & cmake @cmakeArguments
 if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
-cmake --build ct2-build --target install --parallel 2
+cmake --build ct2-build --target install --parallel 2 2>&1 | Tee-Object -FilePath flash-native-build.log
 if ($LASTEXITCODE -ne 0) { throw 'Native compilation failed' }
 $cache = Get-Content ct2-build/CMakeCache.txt -Raw
 if ($cache -notmatch 'CUDA_ARCH_LIST:STRING=8[.]6') { throw 'Wrong GPU architecture in cache' }

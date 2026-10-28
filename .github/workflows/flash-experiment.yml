@@ -11,7 +11,7 @@ concurrency:
 jobs:
   native-wheel:
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -71,6 +71,7 @@ jobs:
         with:
           name: CT2-Flash-build-diagnostics
           path: |
+            flash-native-build.log
             ct2-build/CMakeCache.txt
             ct2-build/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: ignore

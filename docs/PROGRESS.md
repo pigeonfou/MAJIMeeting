@@ -487,3 +487,10 @@ stable restent à réaliser.
 - Premier run [40770695390](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40770695390) : configuration CMake en échec sur le chemin CUDA Windows (échappement \\P). Chemins normalisés et cache SDK ajouté avant compilation ; nouvel essai requis. 78 tests locaux Python réussis avec le moteur standard, pas une validation du moteur Flash.
 
 - Deuxième run [40771641842](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40771641842) : CUDA trouvé, mais architecture reçue comme 8 au lieu de 8.6 par CMake. Arguments transmis comme tableau de chaînes explicites, architecture typée STRING et contrôle du cache ajoutés. SDK CUDA désormais en cache. Troisième essai requis.
+
+
+## Reprise de la compilation Flash après interruption
+
+- Run 40772586388 : job natif annulé après environ 45 minutes, durée correspondant à sa limite ; tests Windows et release sautés. Cause exacte non confirmée, récupération des logs en erreur de transport.
+- Nouvelle tentative : limite portée à 180 minutes et sortie de compilation enregistrée dans `flash-native-build.log`, jointe aux diagnostics même en cas d'échec.
+- Aucun moteur Flash ni installateur expérimental validé à ce stade. Version normale inchangée ; validation GPU RTX 3080 toujours à réaliser.
