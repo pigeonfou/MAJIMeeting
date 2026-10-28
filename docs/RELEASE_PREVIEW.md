@@ -1,19 +1,19 @@
-# MAJIMeeting 0.2.5 — transcription GPU par lots
+# MAJIMeeting 0.2.6 — essais GPU avancés
 
-- Traitement par lots GPU, taille 8 proposée, pour mieux alimenter la carte NVIDIA.
-- Profil Qualité (beam 5, réglage conservé) ou Rapide (beam 1, qualité à comparer).
-- Réduction automatique des lots si la VRAM manque, avant tentative CUDA séquentielle
-  puis éventuel repli CPU si autorisé.
-- Horodatages, audit, résultats et corrections des tentatives précédentes conservés.
-- Mesures : durée totale, chargement, préparation, inférence/VAD et écriture ; mode effectif,
-  taille et vitesse globale affichés dans l'historique et exportés en JSON.
-- Quantification, taille de lot et profil mémorisés entre les sessions.
+- Option Flash Attention, reprise CUDA sans cette option si non prise en charge.
+- Option deux workers natifs : fenêtres concurrentes partageant un seul modèle.
+- Fenêtres de 5 ou 10 minutes et lots jusqu'à 32 sur choix explicite.
+- Tailles réelles des lots, distribution et remplissage dans l'historique et le JSON.
+- Temporaires isolés, annulation coopérative ; reprise à un worker prioritaire si VRAM insuffisante.
 
-Installer par-dessus la version précédente. Dans Import et transcription, choisir CUDA,
-cocher Traitement par lots sur GPU, taille 8 et conserver d'abord Qualité. Comparer la
-même réunion, puis essayer Rapide ou float16 séparément. Aucun nouveau modèle nécessaire.
+Installer par-dessus 0.2.5. Aucun nouveau modèle requis. Flash Attention et deux workers
+restent désactivés par défaut ; données et réglages ordinaires conservés.
 
-Les intégrations 0.2.4 ont été validées par l'utilisateur. La diarisation automatique reste
-à intégrer. Les tests utilisent des poids tiny réels sur CPU et des scénarios GPU simulés ;
-le gain RTX/large-v3 et la qualité sur la réunion réelle restent à mesurer. Le traitement
-par lots peut produire un texte différent du chemin séquentiel. Voir docs/PERFORMANCE.md.
+Comparer sur la même réunion : CUDA / float16 / lots 16 / Rapide, référence 1 worker /
+5 min / Flash non, puis Flash seul, deux workers seuls, fenêtres de dix minutes seules.
+Lire les paramètres effectifs et vérifier les mêmes passages audio. Le taux de remplissage
+n'est pas une occupation GPU. Voir docs/GPU_EXPERIMENTS.md.
+
+Les tests CPU et simulations ne valident pas Flash CUDA ni un gain sur RTX. La compatibilité
+Flash de cette distribution et le gain réel sont à tester. Deux workers peuvent ralentir
+le traitement. La diarisation automatique reste à intégrer.

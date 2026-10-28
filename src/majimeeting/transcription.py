@@ -3,10 +3,11 @@ import gc
 import json
 import math
 import tempfile
+import threading
 import time
 import uuid
 import wave
-from concurrent.futures import CancelledError
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -26,6 +27,9 @@ class TranscriptionOptions:
     batched: bool = False
     batch_size: int = 8
     beam_size: int = 5
+    flash_attention: bool = False
+    gpu_workers: int = 1
+    window_seconds: int = 300
 
     def validate(self):
         folder = Path(self.model_path)
@@ -35,8 +39,12 @@ class TranscriptionOptions:
         allowed = {'cpu': {'int8', 'float32'}, 'cuda': {'float16', 'int8_float16'}}
         if self.device not in allowed or self.compute_type not in allowed[self.device]:
             raise ValueError('Combinaison appareil/quantification non prise en charge.')
-        if self.batch_size not in {1, 2, 4, 8, 16} or self.beam_size not in {1, 5}:
+        if self.batch_size not in {1, 2, 4, 8, 16, 32} or self.beam_size not in {1, 5}:
             raise ValueError('Taille de lot ou profil de qualité invalide.')
+        if self.gpu_workers not in {1, 2} or self.window_seconds not in {300, 600}:
+            raise ValueError('Configuration expérimentale invalide.')
+        if self.gpu_workers == 2 and not self.batched:
+            raise ValueError('Deux workers nécessitent le traitement par lots.')
 
 
 def check_cancel(cancel):
@@ -154,35 +162,45 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
                        'batch_size': effective.batch_size if effective.batched else 1,
                        'model_load_seconds': 0.0, 'prepare_seconds': 0.0,
                        'inference_seconds': 0.0, 'save_seconds': 0.0,
-                       'completed_audio_seconds': 0.0}
+                       'completed_audio_seconds': 0.0, 'flash_attention': effective.flash_attention,
+                       'gpu_workers': effective.gpu_workers, 'window_seconds': effective.window_seconds}
             metrics['attempts'].append(attempt)
             store.set_execution(job, effective.device, effective.compute_type, reason,
                                 reset_segments=len(metrics['attempts']) > 1,
                                 batched=effective.batched,
-                                batch_size=attempt['batch_size'], beam_size=effective.beam_size)
+                                batch_size=attempt['batch_size'], beam_size=effective.beam_size, flash_attention=effective.flash_attention,
+                                gpu_workers=effective.gpu_workers, window_seconds=effective.window_seconds)
             retry = False
             try:
                 if effective.device == 'cuda':
                     (cuda_prepare or prepare_cuda)(effective.cuda_library_path)
                 _run_inference(store, job, tracks, effective, cancel, progress, model_factory,
                                pipeline_factory, attempt)
-            except (RuntimeError, OSError) as exc:
+            except (RuntimeError, OSError, ValueError) as exc:
                 oom = any(token in str(exc).lower() for token in (
                     'out of memory', 'cuda_error_out_of_memory', 'cublas_status_alloc_failed'))
-                if effective.device != 'cuda' or not (oom or is_cuda_error(exc)):
+                flash_error = effective.flash_attention and any(token in str(exc).lower()
+                    for token in ('flash attention', 'flashattention', 'flash_attention'))
+                if effective.device != 'cuda' or not (oom or flash_error or is_cuda_error(exc)):
                     raise
                 check_cancel(cancel)
-                if oom and effective.batched and effective.batch_size > 1:
+                if flash_error and not oom:
+                    reason = 'Flash Attention indisponible : reprise CUDA sans cette option.'
+                    effective = replace(effective, flash_attention=False)
+                elif oom and effective.gpu_workers == 2:
+                    reason = 'Mémoire GPU insuffisante : reprise avec un worker.'
+                    effective = replace(effective, gpu_workers=1)
+                elif oom and effective.batched and effective.batch_size > 1:
                     size = max(1, effective.batch_size // 2)
                     reason = f'Mémoire GPU insuffisante : réduction du lot à {size}.'
                     effective = replace(effective, batch_size=size)
                 elif oom and effective.batched:
                     reason = 'Mémoire GPU insuffisante : reprise CUDA séquentielle.'
-                    effective = replace(effective, batched=False, batch_size=1)
+                    effective = replace(effective, batched=False, batch_size=1, gpu_workers=1)
                 elif effective.allow_cpu_fallback:
                     reason = str(exc)
                     effective = replace(effective, device='cpu', compute_type='int8',
-                                        batched=False, batch_size=1)
+                                        batched=False, batch_size=1, gpu_workers=1, flash_attention=False)
                     progress(f'CUDA indisponible : {reason} Reprise complète sur CPU/int8.')
                 else:
                     raise RuntimeError(f'CUDA indisponible : {exc} '
@@ -216,20 +234,30 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
         progress(f'Chargement du modèle local sur {options.device}/{options.compute_type}…')
         before = time.perf_counter()
         try:
+            extra = {}
+            if options.flash_attention:
+                extra['flash_attention'] = True
+            if options.gpu_workers == 2:
+                extra['num_workers'] = 2
             model = model_factory(options.model_path, device=options.device,
-                                  compute_type=options.compute_type, local_files_only=True)
+                                  compute_type=options.compute_type, local_files_only=True, **extra)
             runner = model
             if options.batched:
                 if pipeline_factory is None:
-                    from faster_whisper import BatchedInferencePipeline
-                    pipeline_factory = BatchedInferencePipeline
-                runner = pipeline_factory(model=model)
+                    pipeline_factory = measured_pipeline
+                if options.gpu_workers == 1:
+                    runner = pipeline_factory(model=model)
         finally:
             metrics['model_load_seconds'] += time.perf_counter() - before
+        if options.gpu_workers == 2:
+            runner = None
+            _run_parallel(store, job, tracks, options, cancel, progress, model,
+                          pipeline_factory, metrics)
+            return
         with tempfile.TemporaryDirectory(prefix='majimeeting-') as temp:
             batch_path = Path(temp) / 'batch.wav'
             for track in tracks:
-                batches = iter(audio_batches(track, batch_path, cancel))
+                batches = iter(audio_batches(track, batch_path, cancel, max_seconds=options.window_seconds))
                 while True:
                     check_cancel(cancel)
                     before = time.perf_counter()
@@ -279,12 +307,15 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
                             metrics['save_seconds'] += time.perf_counter() - before
                         if bounds is not None:
                             progress(f'{track.name} : {offset + end:.0f} s traitées')
+                    collect_batch_sizes(runner, metrics, options.batch_size)
                     metrics['completed_audio_seconds'] += duration
                     progress(f'{track.name} : {offset + duration:.0f} s traitées')
     finally:
         # A lazy iterator or pipeline can otherwise retain the failed GPU model.
         if segments is not None and hasattr(segments, 'close'):
             segments.close()
+        if options.batched and runner is not None:
+            collect_batch_sizes(runner, metrics, options.batch_size)
         segments = runner = model = None
         gc.collect()
 
@@ -303,3 +334,142 @@ def normalize_timestamps(start, end, duration):
     if bounded[0] >= bounded[1]:
         return None, 'outside_audio'
     return bounded, 'clipped' if bounded != (start, end) else None
+
+
+def measured_pipeline(model):
+    """Observe native decoder request sizes, without changing features or generation."""
+    from faster_whisper import BatchedInferencePipeline
+
+    class MeasuredPipeline(BatchedInferencePipeline):
+        def __init__(self, model):
+            super().__init__(model=model)
+            self.observed_batch_sizes = []
+
+        def forward(self, features, *args, **kwargs):
+            self.observed_batch_sizes.append(int(features.shape[0]))
+            return super().forward(features, *args, **kwargs)
+
+    return MeasuredPipeline(model)
+
+
+def collect_batch_sizes(runner, metrics, capacity):
+    sizes = getattr(runner, 'observed_batch_sizes', [])
+    histogram = metrics.setdefault('decoder_batch_sizes', {})
+    for size in sizes:
+        key = str(size)
+        histogram[key] = histogram.get(key, 0) + 1
+        metrics['decoder_requests'] = metrics.get('decoder_requests', 0) + size
+        metrics['decoder_batches'] = metrics.get('decoder_batches', 0) + 1
+        metrics['decoder_capacity'] = metrics.get('decoder_capacity', 0) + capacity
+    sizes.clear()
+
+
+def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline_factory, metrics):
+    """Two bounded windows in flight; separate pipelines share one CT2 model's workers."""
+    import shutil
+    from collections import deque
+
+    abort = threading.Event()
+    lock = threading.Lock()
+    pending = deque()
+    future = None
+    pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix='majimeeting-inference')
+
+    def checkpoint():
+        check_cancel(cancel)
+        check_cancel(abort)
+
+    def decode(path, track_name, offset, duration):
+        runner = segments = None
+        local = {'inference_seconds': 0.0, 'save_seconds': 0.0,
+                 'completed_audio_seconds': 0.0}
+        try:
+            checkpoint()
+            runner = pipeline_factory(model=model)
+            before = time.perf_counter()
+            try:
+                segments, _ = runner.transcribe(str(path), language=options.language,
+                    beam_size=options.beam_size, vad_filter=True, without_timestamps=False,
+                    batch_size=options.batch_size)
+                segments = iter(segments)
+            finally:
+                local['inference_seconds'] += time.perf_counter() - before
+            while True:
+                checkpoint()
+                before = time.perf_counter()
+                try:
+                    segment = next(segments)
+                except StopIteration:
+                    break
+                finally:
+                    local['inference_seconds'] += time.perf_counter() - before
+                checkpoint()
+                text = segment.text.strip()
+                if not text:
+                    continue
+                bounds, warning = normalize_timestamps(segment.start, segment.end, duration)
+                before = time.perf_counter()
+                try:
+                    if warning:
+                        store.add_transcription_warning(job, track_name, offset,
+                            segment.start, segment.end, warning, text)
+                    if bounds is not None:
+                        start, end = bounds
+                        store.add_segment(job, track_name, offset + start, offset + end, text)
+                finally:
+                    local['save_seconds'] += time.perf_counter() - before
+            local['completed_audio_seconds'] = duration
+            progress(f'{track_name} : fenêtre {offset:.0f}–{offset + duration:.0f} s terminée '
+                     '(deux workers ; ordre de fin variable)')
+        finally:
+            if segments is not None and hasattr(segments, 'close'):
+                segments.close()
+            if runner is not None:
+                collect_batch_sizes(runner, local, options.batch_size)
+            segments = runner = None
+            with lock:
+                for key in ('inference_seconds', 'save_seconds', 'completed_audio_seconds',
+                            'decoder_requests', 'decoder_batches', 'decoder_capacity'):
+                    metrics[key] = metrics.get(key, 0) + local.get(key, 0)
+                histogram = metrics.setdefault('decoder_batch_sizes', {})
+                for key, count in local.get('decoder_batch_sizes', {}).items():
+                    histogram[key] = histogram.get(key, 0) + count
+
+    try:
+        with tempfile.TemporaryDirectory(prefix='majimeeting-parallel-') as temp:
+            # Always drain tasks before deleting their files, including on error/cancel.
+            try:
+                index = 0
+                scratch = Path(temp) / 'prepare.wav'
+                for track in tracks:
+                    batches = iter(audio_batches(track, scratch, cancel,
+                                                 max_seconds=options.window_seconds))
+                    while True:
+                        checkpoint()
+                        if len(pending) >= 2:
+                            future = pending.popleft()
+                            future.result()
+                            future = None
+                        before = time.perf_counter()
+                        try:
+                            offset, duration = next(batches)
+                            destination = Path(temp) / f'slot-{index % 2}.wav'
+                            shutil.copyfile(scratch, destination)
+                        except StopIteration:
+                            break
+                        finally:
+                            metrics['prepare_seconds'] += time.perf_counter() - before
+                        progress(f'{track.name} : fenêtre à {offset:.0f} s confiée aux workers')
+                        pending.append(pool.submit(decode, destination, track.name, offset, duration))
+                        index += 1
+                while pending:
+                    future = pending.popleft()
+                    future.result()
+                    future = None
+            finally:
+                abort.set()
+                pool.shutdown(wait=True, cancel_futures=True)
+    finally:
+        # Tracebacks must not keep the shared GPU model alive across an automatic retry.
+        model = future = None
+        pending.clear()

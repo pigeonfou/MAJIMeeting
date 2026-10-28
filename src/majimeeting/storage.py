@@ -89,7 +89,8 @@ class MeetingStore:
                        (state, error, job))
 
     def set_execution(self, job, device, compute_type, fallback_reason='', reset_segments=False,
-                      batched=False, batch_size=1, beam_size=5):
+                      batched=False, batch_size=1, beam_size=5, flash_attention=False,
+                      gpu_workers=1, window_seconds=300):
         with self.connect() as db:
             row = db.execute('SELECT options FROM transcription_jobs WHERE id=?', (job,)).fetchone()
             if row is None:
@@ -97,7 +98,9 @@ class MeetingStore:
             options = json.loads(row['options'])
             options['execution'] = {'device': device, 'compute_type': compute_type,
                                     'fallback_reason': fallback_reason, 'batched': batched,
-                                    'batch_size': batch_size, 'beam_size': beam_size}
+                                    'batch_size': batch_size, 'beam_size': beam_size,
+                                    'flash_attention': flash_attention, 'gpu_workers': gpu_workers,
+                                    'window_seconds': window_seconds}
             if reset_segments:
                 db.execute('DELETE FROM transcript_segments WHERE job_id=?', (job,))
                 db.execute('DELETE FROM transcription_warnings WHERE job_id=?', (job,))

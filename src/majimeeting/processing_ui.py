@@ -80,7 +80,7 @@ class ProcessingPanel(QWidget):
         self.batched.setChecked(self.settings.value('batched', True, type=bool))
         layout.addWidget(self.batched)
         self.batch_size = QComboBox()
-        for size in (1, 2, 4, 8, 16):
+        for size in (1, 2, 4, 8, 16, 32):
             self.batch_size.addItem(str(size), size)
         self.batch_size.setCurrentText(str(self.settings.value('batch_size', 8)))
         layout.addWidget(QLabel('Taille des lots GPU : 8 conseillé pour commencer'))
@@ -90,6 +90,20 @@ class ProcessingPanel(QWidget):
         self.quality.addItem('Rapide — recherche de 1 hypothèse (qualité à comparer)', 1)
         self.quality.setCurrentIndex(1 if self.settings.value('beam_size', 5, type=int) == 1 else 0)
         layout.addWidget(self.quality)
+        layout.addWidget(QLabel('Options expérimentales GPU — à comparer séparément'))
+        self.flash = QCheckBox('Flash Attention (reprise sans cette option si non pris en charge)')
+        self.flash.setChecked(self.settings.value('flash_attention', False, type=bool))
+        layout.addWidget(self.flash)
+        self.workers = QComboBox()
+        self.workers.addItem('1 worker — référence', 1)
+        self.workers.addItem('2 workers — fenêtres concurrentes, mémoire supplémentaire', 2)
+        self.workers.setCurrentIndex(1 if self.settings.value('gpu_workers', 1, type=int) == 2 else 0)
+        layout.addWidget(self.workers)
+        self.audio_window = QComboBox()
+        self.audio_window.addItem('Fenêtres de 5 minutes — référence', 300)
+        self.audio_window.addItem('Fenêtres de 10 minutes — mieux remplir les grands lots', 600)
+        self.audio_window.setCurrentIndex(1 if self.settings.value('window_seconds', 300, type=int) == 600 else 0)
+        layout.addWidget(self.audio_window)
         self.device_changed(self.device.currentText())
         self.compute.setCurrentText(str(self.settings.value('compute_type', self.compute.currentText())))
         layout.addWidget(QLabel('CUDA : cuBLAS CUDA 12 + cuDNN 9 requis ; CPU sans GPU disponible.'))
@@ -140,16 +154,21 @@ class ProcessingPanel(QWidget):
         if hasattr(self, 'batched'):
             self.batched.setEnabled(device == 'cuda')
             self.batch_size.setEnabled(device == 'cuda')
+        if hasattr(self, 'flash'):
+            for widget in (self.flash, self.workers, self.audio_window):
+                widget.setEnabled(device == 'cuda')
 
     def set_busy(self, active):
         for widget in (self.import_button, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
                        self.transcribe_button, self.export_button, self.edit_button,
-                       self.batched, self.batch_size, self.quality):
+                       self.batched, self.batch_size, self.quality, self.flash, self.workers, self.audio_window):
             widget.setEnabled(not active)
         if not active:
             self.batched.setEnabled(self.device.currentText() == 'cuda')
             self.batch_size.setEnabled(self.device.currentText() == 'cuda')
+            for widget in (self.flash, self.workers, self.audio_window):
+                widget.setEnabled(self.device.currentText() == 'cuda')
             self.cancel_button.setEnabled(False)
 
     def progress(self, message, percent=None):
@@ -230,13 +249,20 @@ class ProcessingPanel(QWidget):
                                        cuda_library_path=self.cuda_path.text().strip(),
                                        batched=self.device.currentText() == 'cuda' and self.batched.isChecked(),
                                        batch_size=self.batch_size.currentData(),
-                                       beam_size=self.quality.currentData())
+                                       beam_size=self.quality.currentData(),
+                                       flash_attention=self.device.currentText() == 'cuda' and self.flash.isChecked(),
+                                       gpu_workers=(self.workers.currentData() if self.device.currentText() == 'cuda'
+                                                    and self.batched.isChecked() else 1),
+                                       window_seconds=(self.audio_window.currentData() if self.device.currentText() == 'cuda' else 300))
         self.settings.setValue('model', options.model_path)
         self.settings.setValue('device', options.device)
         self.settings.setValue('compute_type', options.compute_type)
         self.settings.setValue('batched', self.batched.isChecked())
         self.settings.setValue('batch_size', options.batch_size)
         self.settings.setValue('beam_size', options.beam_size)
+        self.settings.setValue('flash_attention', self.flash.isChecked())
+        self.settings.setValue('gpu_workers', self.workers.currentData())
+        self.settings.setValue('window_seconds', self.audio_window.currentData())
         self.settings.setValue('cuda_path', options.cuda_library_path)
         self.settings.setValue('cpu_fallback', options.allow_cpu_fallback)
         self.submit('transcribe', transcribe_meeting, self.window.store, self.current_meeting,
@@ -269,7 +295,10 @@ class ProcessingPanel(QWidget):
         mode = (f"lots de {execution.get('batch_size', '?')}" if execution.get('batched')
                 else 'séquentiel')
         self.execution.setText((f"Calcul réellement utilisé : {actual}, {mode}, "
-                                f"beam={execution.get('beam_size', '?')}. " +
+                                f"beam={execution.get('beam_size', '?')}, "
+                                f"workers={execution.get('gpu_workers', 1)}, "
+                                f"Flash Attention={'oui' if execution.get('flash_attention') else 'non'}, "
+                                f"fenêtres={execution.get('window_seconds', 300)} s. " +
                                 (f'Adaptation du calcul : {reason}' if reason else ''))
                                if execution else '')
         metrics = details.get('metrics', {})
@@ -284,6 +313,19 @@ class ProcessingPanel(QWidget):
             f"inférence/VAD : {sum(a.get('inference_seconds', 0) for a in attempts):.1f} s ; "
             f"écriture : {sum(a.get('save_seconds', 0) for a in attempts):.1f} s ; "
             f'{len(attempts)} tentative(s) de calcul.' if total > 0 else '')
+        if attempts:
+            last = attempts[-1]
+            batches = last.get('decoder_batches', 0)
+            capacity = last.get('decoder_capacity', 0)
+            if batches and capacity:
+                requests = last.get('decoder_requests', 0)
+                histogram = last.get('decoder_batch_sizes', {})
+                self.performance.setText(self.performance.text() +
+                    f' Lots natifs : {batches}, portions : {requests}, '
+                    f'remplissage : {100 * requests / capacity:.1f} %, tailles : {histogram}.')
+            if last.get('gpu_workers', 1) == 2:
+                self.performance.setText(self.performance.text() +
+                    ' Les temps inférence/écriture sont cumulés entre workers et peuvent dépasser la durée totale.')
         counts = self.window.store.warning_counts(job) if job else {}
         warning_count = sum(counts.values())
         self.warnings_button.setEnabled(warning_count > 0)

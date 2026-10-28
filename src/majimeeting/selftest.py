@@ -7,13 +7,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from faster_whisper import BatchedInferencePipeline, WhisperModel
+from faster_whisper import WhisperModel
 
 from majimeeting.cuda_runtime import CudaUnavailableError
 from majimeeting.storage import FragmentWriter, MeetingStore
 from majimeeting.transcription import (
     TranscriptionOptions,
     import_audio,
+    measured_pipeline,
     normalize_timestamps,
     transcribe_meeting,
 )
@@ -26,7 +27,7 @@ def inference_smoke(model_path):
                                    vad_filter=False, beam_size=1)
     list(segments)
     # Exercise a real batch of two decoder requests, even though silence is removed by VAD.
-    pipeline = BatchedInferencePipeline(model=model)
+    pipeline = measured_pipeline(model)
     batch_shapes = []
     original_encode = model.encode
 
@@ -41,6 +42,7 @@ def inference_smoke(model_path):
         clip_timestamps=[{'start': 0, 'end': 1}, {'start': 31, 'end': 32}])
     decoded = list(batch_segments)
     assert batch_shapes == [2], batch_shapes
+    assert pipeline.observed_batch_sizes == [2]
     assert info.transcription_options.without_timestamps is False
     # Raw Whisper timestamps may extend into padding, as in the 0.2.3 regression.
     # Apply the production guard rather than requiring perfect timestamps from silence.
@@ -51,6 +53,7 @@ def inference_smoke(model_path):
     model.encode = original_encode
     del pipeline, original_encode, counted_encode, batch_segments, segments
     del model
+    native_parallel_smoke(model_path)
     with tempfile.TemporaryDirectory(prefix='majimeeting-selftest-') as temp:
         folder = Path(temp)
         audio = folder / 'silence.wav'
@@ -71,6 +74,16 @@ def inference_smoke(model_path):
         batch_details = json.loads(store.transcription_jobs(meeting)[0]['options'])
         assert batch_details['execution']['batched'] is True
         assert batch_details['metrics']['attempts'][0]['completed_audio_seconds'] == 3
+        second = FragmentWriter(store.root / meeting / 'track-01', 16000, 1, {})
+        second.write(b'\0\0' * 16000 * 3, .25)
+        second.close()
+        parallel_job = transcribe_meeting(store, meeting, replace(
+            TranscriptionOptions(model_path), batched=True, batch_size=2, beam_size=1,
+            gpu_workers=2))
+        assert not store.segments(parallel_job)
+        parallel_details = json.loads(store.transcription_jobs(meeting)[0]['options'])
+        assert parallel_details['execution']['gpu_workers'] == 2
+        assert parallel_details['metrics']['attempts'][0]['completed_audio_seconds'] == 6
         # Reproduce the reported missing-cuBLAS failure, then use the real CPU engine.
         def missing_cublas(path):
             raise CudaUnavailableError('cublas64_12.dll is not found or cannot be loaded')
@@ -208,3 +221,26 @@ def editor_smoke():
         assert sum(buffers) == 8000, buffers
     print('Editor corrections and Qt WAV decoder smoke passed')
     return 0
+
+
+def native_parallel_smoke(model_path):
+    """Real concurrent decoder requests on two CPU workers sharing one model."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    model = WhisperModel(model_path, device='cpu', compute_type='int8',
+                         local_files_only=True, num_workers=2)
+    barrier = threading.Barrier(2)
+
+    def decode():
+        pipeline = measured_pipeline(model)
+        barrier.wait(timeout=15)
+        segments, _ = pipeline.transcribe(np.zeros(16000, dtype=np.float32), language='fr',
+            vad_filter=False, without_timestamps=False, beam_size=1, batch_size=1,
+            max_new_tokens=16)
+        list(segments)
+        return pipeline.observed_batch_sizes
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(decode) for _ in range(2)]
+        assert [future.result(timeout=60) for future in futures] == [[1], [1]]

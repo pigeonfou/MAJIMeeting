@@ -73,3 +73,10 @@ réussis sans précision. Le décodage automatisé ne remplace pas une écoute W
 
 Retour utilisateur : intégrations 0.2.4 validées. Ce retour ne clôt pas les tests matériels
 J1 reportés ni les comparaisons de performance et de qualité ci-dessus.
+
+## GPU avancé 0.2.6 — à réaliser
+
+Protocole dans [GPU_EXPERIMENTS.md](GPU_EXPERIMENTS.md). Référence 1 worker / 5 min / Flash
+non, puis changer une option à la fois. Contrôler le mode effectif, la durée totale, les
+tailles natives et la qualité. Si Flash est refusé, vérifier la reprise CUDA sans Flash
+et sa raison. Tester Annuler avec deux workers et la conservation des autres tentatives.
