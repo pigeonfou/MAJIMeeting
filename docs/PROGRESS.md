@@ -195,6 +195,22 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
   après quatre lots de cinq minutes et un dernier lot court. Tests des bornes, NaN/infini,
   texte vide, migration additive de la base et affichage/export de l'audit réussis.
 - Inférence CPU réelle avec tiny et contrôle de régression local réussis. CI et exécutable
-  Windows installé à vérifier avant publication.
+  Windows installé validés ; références ci-dessous.
 - À confirmer sur la réunion utilisateur : fin complète de la transcription et vérification
   des passages signalés. Les autres essais matériels en attente gardent leur statut.
+
+## Références du correctif d'horodatage 0.2.3
+
+- [PR nº 5](https://github.com/pigeonfou/MAJIMeeting/pull/5) fusionnée.
+- Implémentation : `1772b46743159d3ba819fb4a5a89ecfd838a35b6` ; fusion : `c14faa05c89c305d706f5c20c278e3950daec81f`.
+- [CI PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40718027000) et
+  [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40719072803) réussies.
+- 57 tests sur Windows et Linux, Ruff, démarrage Qt, vraie inférence tiny CPU et repli CPU
+  après DLL manquante simulée réussis.
+- Installation Windows et régression des limites après 1200 secondes, avec un décodeur
+  simulé déterministe, réussies dans l'exécutable installé.
+- [Préversion v0.2.3-preview.27](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.3-preview.27) publiée le 28 octobre 2026.
+- Les poids, réglages CUDA, pistes et tentatives précédentes sont conservés. Relancer une
+  nouvelle tentative de la réunion existante ; elle repart du début, sans réimporter l'audio.
+- À confirmer sur la réunion utilisateur : traitement complet et vérification des
+  avertissements. Les tests automatisés ne prouvent pas l'exactitude des paroles reconnues.
