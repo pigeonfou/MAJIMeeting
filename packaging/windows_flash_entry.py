@@ -11,7 +11,7 @@ def run():
         from majimeeting.flash_build import verify_native_flash
         print(verify_native_flash())
         return 0
-    from majimeeting import __main__ as application
+    import majimeeting.__main__ as application
 
     BaseWindow = application.MainWindow
 

@@ -501,3 +501,6 @@ stable restent à réaliser.
 - Run 40779226342 : compilation native réussie, sonde Flash native et tests applicatifs/lint réussis ; inférence CPU réelle réussie. EXE et installateur construits.
 - Contrôle installé : sonde native réussie, `--smoke-test` interrompu après 30 secondes. Aucune release publiée ; GPU non testé.
 - Ajout d'un journal de démarrage persistant et capture des exceptions avant la boîte de dialogue PyInstaller ; nouvelle exécution pour identifier la cause du blocage.
+
+
+- Run 40790144043 : diagnostic récupéré. Cause confirmée : `ImportError: cannot import name '__main__' from 'majimeeting'` dans l'EXE installé. Import du sous-module rendu explicite pour l'analyse PyInstaller ; contrôles Windows relancés. Le journal a supprimé le blocage sur boîte de dialogue et conservé la trace complète.
