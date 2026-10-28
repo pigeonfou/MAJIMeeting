@@ -177,6 +177,8 @@ class MainWindow(QMainWindow):
                 if kind == 'import':
                     self.reload_meetings()
                 QMessageBox.warning(self, "MAJIMeeting", str(exc))
+            if kind != 'devices':
+                self.processing.finish_progress(future.exception() is None)
             self.processing.reload()
         if self.session and self.session.done.is_set():
             error = self.session.error
@@ -220,6 +222,10 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    if '--download-smoke' in sys.argv:
+        from majimeeting.model_download import download_model
+        download_model(sys.argv[sys.argv.index('--download-smoke') + 1], model_name='tiny')
+        return 0
     if '--inference-smoke' in sys.argv:
         from majimeeting.selftest import inference_smoke
         return inference_smoke(sys.argv[sys.argv.index('--inference-smoke') + 1])

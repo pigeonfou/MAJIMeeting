@@ -9,6 +9,7 @@ from concurrent.futures import CancelledError
 from dataclasses import dataclass
 from pathlib import Path
 
+from majimeeting.model_download import download_model  # noqa: F401 (public compatibility import)
 from majimeeting.storage import FragmentWriter
 
 
@@ -32,12 +33,6 @@ class TranscriptionOptions:
 def check_cancel(cancel):
     if cancel is not None and cancel.is_set():
         raise CancelledError('Traitement annulé ; résultats déjà enregistrés conservés.')
-
-
-def download_model(destination):
-    """The only explicit network operation: fetch large-v3 weights, never meeting data."""
-    from faster_whisper.utils import download_model as fetch
-    return fetch('large-v3', output_dir=str(destination))
 
 
 def import_audio(store, source, cancel=None, progress=lambda message: None):

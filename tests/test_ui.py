@@ -45,3 +45,43 @@ def test_transcription_panel_selection_history_and_export(tmp_path):
     window.busy(False)
     window.close()
     app.processEvents()
+
+
+def test_model_download_button_reports_progress_and_can_cancel(tmp_path, monkeypatch):
+    import threading
+    from concurrent.futures import CancelledError
+
+    import pytest
+
+    import majimeeting.processing_ui as processing_ui
+    app = QApplication.instance() or QApplication([])
+    started = threading.Event()
+
+    def fake_download(destination, cancel, progress):
+        progress('model.bin : 42 / 100 Mo', 42)
+        started.set()
+        assert cancel.wait(3)
+        raise CancelledError('Cancelled by test')
+
+    monkeypatch.setattr(processing_ui, 'download_model', fake_download)
+    window = MainWindow(MeetingStore(tmp_path / 'data'), scan=False)
+    panel = window.processing
+    panel.model.setText(str(tmp_path / 'model'))
+    panel.download.click()
+    assert started.wait(3)
+    app.processEvents()
+    panel.poll_progress()
+    assert panel.progress_bar.value() == 42
+    assert '42 / 100' in panel.download_status.text()
+    assert panel.cancel_button.isEnabled()
+    assert not window.start_button.isEnabled()
+    future = window.task[1]
+    panel.cancel_button.click()
+    with pytest.raises(CancelledError):
+        future.result(timeout=3)
+    window.poll()
+    assert 'annulé' in window.status.text()
+    assert panel.download_status.text() == window.status.text()
+    assert panel.download.isEnabled()
+    window.close()
+    app.processEvents()

@@ -84,7 +84,7 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Transcription par lots audio de cinq minutes, pistes traitées successivement ; frontière
   de lot sans recouvrement, à évaluer sur la qualité des mots à la jonction.
 - Annulation coopérative : attend le chargement modèle ou la fin du segment en cours.
-  Téléchargement des poids non annulable dans l'interface ; téléchargement reprenable au relancement.
+  Téléchargement des poids annulable et reprenable depuis le bouton ; délais réseau explicites.
 - Les imports conservent l'original et décodent la première piste audio en mono 16 kHz.
 - Aucun locuteur identifié : les noms track-XX désignent des sources, pas des personnes.
   Pas encore de diarisation, lecture synchronisée, correction ni compte rendu.
@@ -117,3 +117,19 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Le jalon 2 reste en validation utilisateur : qualité française large-v3, CUDA/RTX,
   longues réunions et frontières de lots encore à vérifier. Les essais J1 restants
   demeurent « à réaliser » ; ils ne sont pas assimilés à des succès.
+
+## Correctif du téléchargement — 28 octobre 2026
+
+- Signalement utilisateur : clic sur Télécharger sans activité réseau visible, application
+  semblant bloquée. La cause exacte sur son PC n'est pas encore isolée.
+- Lacune identifiée : aucun détail de progression et aucun test du téléchargement dans le
+  programme installé ; le précédent test d'inférence utilisait des poids récupérés par Python.
+- Remplacement du chemin SDK de téléchargement par HTTPS en streaming, sans charger
+  le moteur IA ; connexion/lecture avec délais, progression en Mo/pourcentage, annulation,
+  reprise HTTP Range, vérification SHA-256/Git blob et journal local `download.log`.
+- Point d'entrée PyInstaller protégé par `multiprocessing.freeze_support()`.
+- Local : 33 tests réussis, Ruff réussi ; vrai téléchargement tiny avec contrôle d'intégrité
+  réussi et inférence CPU hors ligne avec les fichiers téléchargés réussie.
+- CI : téléchargement réel depuis l'exécutable installé ajouté, puis inférence hors ligne.
+  Résultats et release du correctif à consigner après exécution.
+- Les autres essais matériels précédemment marqués à réaliser conservent ce statut.

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -56,6 +57,13 @@ class ProcessingPanel(QWidget):
         self.download = QPushButton('Télécharger large-v3 (~3 Go, connexion requise)')
         self.download.clicked.connect(self.fetch_model)
         layout.addWidget(self.download)
+        self.download_status = QLabel('Modèle local : aucun téléchargement en cours.')
+        self.download_status.setWordWrap(True)
+        layout.addWidget(self.download_status)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        layout.addWidget(self.progress_bar)
         self.device = QComboBox()
         self.device.addItems(['cpu', 'cuda'])
         self.compute = QComboBox()
@@ -96,26 +104,43 @@ class ProcessingPanel(QWidget):
         if not active:
             self.cancel_button.setEnabled(False)
 
-    def progress(self, message):
+    def progress(self, message, percent=None):
         try:
             self.messages.get_nowait()
         except queue.Empty:
             pass
         try:
-            self.messages.put_nowait(message)
+            self.messages.put_nowait((message, percent))
         except queue.Full:
             pass
 
     def poll_progress(self):
         try:
-            self.window.status.setText(self.messages.get_nowait())
+            message, percent = self.messages.get_nowait()
+            self.window.status.setText(message)
+            self.download_status.setText(message)
+            self.progress_bar.setRange(0, 0 if percent is None else 100)
+            if percent is not None:
+                self.progress_bar.setValue(percent)
         except queue.Empty:
             pass
+
+    def finish_progress(self, success):
+        while not self.messages.empty():
+            self.messages.get_nowait()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(100 if success else 0)
+        self.download_status.setText(self.window.status.text())
 
     def submit(self, kind, function, *args, cancellable=False):
         self.cancel.clear()
         self.window.busy(True)
         self.window.status.setText('Traitement en cours…')
+        self.download_status.setText('Connexion au serveur de modèles…' if kind == 'download'
+                                     else 'Traitement en cours…')
+        self.progress_bar.setRange(0, 0)
+        self.cancel_button.setText('Annuler le téléchargement' if kind == 'download'
+                                   else 'Annuler le traitement (après le segment en cours)')
         self.cancel_button.setEnabled(cancellable)
         self.window.task = (kind, self.window.pool.submit(function, *args))
 
@@ -130,7 +155,8 @@ class ProcessingPanel(QWidget):
         if not destination:
             return
         self.settings.setValue('model', destination)
-        self.submit('download', download_model, destination)
+        self.submit('download', download_model, destination, self.cancel, self.progress,
+                    cancellable=True)
 
     def import_file(self):
         path, _ = QFileDialog.getOpenFileName(self, 'Importer de l’audio', '',
