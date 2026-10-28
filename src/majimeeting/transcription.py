@@ -6,9 +6,10 @@ import tempfile
 import uuid
 import wave
 from concurrent.futures import CancelledError
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
+from majimeeting.cuda_runtime import is_cuda_error, prepare_cuda
 from majimeeting.model_download import download_model  # noqa: F401 (public compatibility import)
 from majimeeting.storage import FragmentWriter
 
@@ -19,6 +20,8 @@ class TranscriptionOptions:
     device: str = 'cpu'
     compute_type: str = 'int8'
     language: str = 'fr'
+    allow_cpu_fallback: bool = True
+    cuda_library_path: str = ''
 
     def validate(self):
         folder = Path(self.model_path)
@@ -126,21 +129,57 @@ def audio_batches(track, destination, cancel=None, max_seconds=300):
 
 
 def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda message: None,
-                       model_factory=None):
+                       model_factory=None, cuda_prepare=None):
     options.validate()
     check_cancel(cancel)
     tracks = sorted((store.root / meeting_id).glob('track-*'))
     tracks = [t for t in tracks if (t / 'track.json').is_file() and any(t.glob('*.wav'))]
     if not tracks:
         raise ValueError('Aucune piste audio finalisée à transcrire.')
-    if model_factory is None:
-        from faster_whisper import WhisperModel
-        model_factory = WhisperModel
     job = uuid.uuid4().hex
     store.start_transcription(job, meeting_id, options)
-    model = None
+    effective = options
+    retry_cpu = False
     try:
-        progress('Chargement du modèle local…')
+        store.set_execution(job, options.device, options.compute_type)
+        try:
+            if options.device == 'cuda':
+                (cuda_prepare or prepare_cuda)(options.cuda_library_path)
+            _run_inference(store, job, tracks, effective, cancel, progress, model_factory)
+        except (RuntimeError, OSError) as exc:
+            if options.device != 'cuda' or not is_cuda_error(exc):
+                raise
+            if not options.allow_cpu_fallback:
+                raise RuntimeError(f'CUDA indisponible : {exc} '
+                                   'Choisissez CPU/int8 ou configurez les bibliothèques NVIDIA.') from exc
+            check_cancel(cancel)
+            reason = str(exc)
+            progress(f'CUDA indisponible : {reason} Reprise complète sur CPU/int8.')
+            effective = replace(options, device='cpu', compute_type='int8')
+            # Delete only this attempt's GPU segments, avoiding duplicates on full restart.
+            store.set_execution(job, 'cpu', 'int8', reason, reset_segments=True)
+            retry_cpu = True
+        if retry_cpu:
+            # Exit the exception handler first: its traceback may retain the failed GPU model.
+            gc.collect()
+            _run_inference(store, job, tracks, effective, cancel, progress, model_factory)
+        check_cancel(cancel)
+        store.finish_transcription(job, 'completed')
+        return job
+    except Exception as exc:
+        state = 'cancelled' if isinstance(exc, CancelledError) else 'failed'
+        store.finish_transcription(job, state, str(exc))
+        raise
+
+
+def _run_inference(store, job, tracks, options, cancel, progress, model_factory):
+    model = None
+    segments = None
+    try:
+        if model_factory is None:
+            from faster_whisper import WhisperModel
+            model_factory = WhisperModel
+        progress(f'Chargement du modèle local sur {options.device}/{options.compute_type}…')
         model = model_factory(options.model_path, device=options.device,
                               compute_type=options.compute_type, local_files_only=True)
         with tempfile.TemporaryDirectory(prefix='majimeeting-') as temp:
@@ -162,14 +201,10 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
                                               offset + min(end, duration),
                                               segment.text.strip())
                         progress(f'{track.name} : {offset + end:.0f} s traitées')
-        check_cancel(cancel)
-        store.finish_transcription(job, 'completed')
-        return job
-    except Exception as exc:
-        state = 'cancelled' if isinstance(exc, CancelledError) else 'failed'
-        store.finish_transcription(job, state, str(exc))
-        raise
     finally:
-        # Model lifetime is confined to this job. No transcription model during capture.
-        del model
+        # Close the lazy iterator too: it can otherwise retain the failed GPU model.
+        if segments is not None and hasattr(segments, 'close'):
+            segments.close()
+        segments = None
+        model = None
         gc.collect()

@@ -147,3 +147,20 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - [Préversion v0.2.1-preview.17](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.1-preview.17) publiée le 28 octobre 2026.
 - À confirmer sur le PC utilisateur : téléchargement complet large-v3 avec ce correctif.
   Le signalement initial n'est pas déclaré résolu sur son matériel sans son retour.
+
+## Correctif CUDA — 28 octobre 2026
+
+- Capture utilisateur : `Library cublas64_12.dll is not found or cannot be loaded`.
+  Le chargement de la bibliothèque CUDA échoue ; cela ne démontre pas un modèle corrompu.
+- Vérification préalable des DLL NVIDIA et du pilote, découverte des dossiers CUDA 12/cuDNN 9
+  et champ facultatif pour les bibliothèques déjà installées.
+- Repli CPU/int8 autorisé par une case visible ; moteur GPU libéré avant reprise CPU.
+  Les erreurs pendant l'itération des segments sont couvertes, sans duplication des
+  résultats ni modification d'une tentative antérieure. Annuler ne relance pas le CPU.
+- Historique enrichi avec appareil/quantification effectifs et raison du repli.
+- Local : 42 tests réussis et Ruff réussi. Inférence réelle CPU et repli après DLL
+  manquante simulée réussis avec le modèle tiny. CI et installateur Windows à contrôler.
+- Les DLL CUDA/cuDNN restent à installer séparément depuis NVIDIA si l'utilisateur veut
+  activer le GPU. La reprise CPU n'est pas une validation de l'accélération RTX.
+- Les autres essais matériels en attente restent à réaliser.
+

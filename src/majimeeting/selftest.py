@@ -1,11 +1,14 @@
 """Small-model CPU integration check for CI and the packaged executable."""
+import json
 import tempfile
 import wave
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
 from faster_whisper import WhisperModel
 
+from majimeeting.cuda_runtime import CudaUnavailableError
 from majimeeting.storage import MeetingStore
 from majimeeting.transcription import TranscriptionOptions, import_audio, transcribe_meeting
 
@@ -30,4 +33,17 @@ def inference_smoke(model_path):
         job = transcribe_meeting(store, meeting, TranscriptionOptions(model_path))
         assert store.transcription_jobs(meeting)[0]['status'] == 'completed'
         assert not store.segments(job), 'Silence must not produce a transcript with VAD enabled'
+        # Reproduce the reported missing-cuBLAS failure, then use the real CPU engine.
+        def missing_cublas(path):
+            raise CudaUnavailableError('cublas64_12.dll is not found or cannot be loaded')
+
+        cuda_options = replace(TranscriptionOptions(model_path), device='cuda',
+                               compute_type='float16')
+        fallback_job = transcribe_meeting(store, meeting, cuda_options,
+                                          cuda_prepare=missing_cublas)
+        row = store.transcription_jobs(meeting)[0]
+        assert row['id'] == fallback_job and row['status'] == 'completed'
+        execution = json.loads(row['options'])['execution']
+        assert execution['device'] == 'cpu' and execution['compute_type'] == 'int8'
+        assert 'cublas64_12.dll' in execution['fallback_reason']
     return 0

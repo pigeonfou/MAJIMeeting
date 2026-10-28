@@ -69,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-installed'
-          $setup = Start-Process dist/MAJIMeeting-0.2.1-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          $setup = Start-Process dist/MAJIMeeting-0.2.2-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installation failed: $($setup.ExitCode)" }
           $app = Start-Process "$target/MAJIMeeting.exe" -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(30000)) { $app.Kill(); throw 'Installed app timeout' }
@@ -95,7 +95,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: MAJIMeeting-Windows-preview
-          path: dist/MAJIMeeting-0.2.1-preview-Setup.exe
+          path: dist/MAJIMeeting-0.2.2-preview-Setup.exe
           if-no-files-found: error
   preview-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -112,6 +112,6 @@ jobs:
       - name: Publish tested installer as prerelease
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v0.2.1-preview.${{ github.run_number }}
+          RELEASE_TAG: v0.2.2-preview.${{ github.run_number }}
         run: |
           gh release create "$RELEASE_TAG" release-assets/*.exe --target "$GITHUB_SHA" --prerelease --title "MAJIMeeting $RELEASE_TAG — prototype transcription locale" --notes-file docs/RELEASE_PREVIEW.md

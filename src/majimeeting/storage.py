@@ -79,6 +79,19 @@ class MeetingStore:
             db.execute("UPDATE transcription_jobs SET status=?,error=? WHERE id=?",
                        (state, error, job))
 
+    def set_execution(self, job, device, compute_type, fallback_reason='', reset_segments=False):
+        with self.connect() as db:
+            row = db.execute('SELECT options FROM transcription_jobs WHERE id=?', (job,)).fetchone()
+            if row is None:
+                raise ValueError('Traitement introuvable.')
+            options = json.loads(row['options'])
+            options['execution'] = {'device': device, 'compute_type': compute_type,
+                                    'fallback_reason': fallback_reason}
+            if reset_segments:
+                db.execute('DELETE FROM transcript_segments WHERE job_id=?', (job,))
+            db.execute('UPDATE transcription_jobs SET options=? WHERE id=?',
+                       (json.dumps(options), job))
+
     def transcription_jobs(self, meeting_id):
         with self.connect() as db:
             return db.execute("SELECT * FROM transcription_jobs WHERE meeting_id=? "

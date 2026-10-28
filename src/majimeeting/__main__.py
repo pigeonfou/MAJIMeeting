@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
                             break
                     self.status.setText('Import terminé. Réunion sélectionnée pour transcription.')
                 elif kind == 'transcribe':
-                    self.status.setText('Transcription terminée.')
+                    self.status.setText('Transcription terminée ; consultez le mode de calcul dans l’historique.')
                 elif kind == 'download':
                     self.status.setText('Modèle installé. La transcription fonctionne hors ligne.')
                 else:
