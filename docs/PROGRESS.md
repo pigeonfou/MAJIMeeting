@@ -466,3 +466,20 @@ installateur requis pour consigner ce retour. Réglages déjà mémorisés par l
 Prochaine fonctionnalité : suite du jalon 3, diarisation automatique Community-1 et
 correction des locuteurs détectés. Les essais J1 reportés et les conditions de release
 stable restent à réaliser.
+
+
+## Tentative de compilation Flash Windows — 28 octobre 2026
+
+- Accord utilisateur pour essayer un moteur personnalisé avec Flash Attention.
+- Branche expérimentale séparée ; moteur et installateur normaux conservés.
+- CTranslate2 4.8.4 fixé au commit `5de572ef60b67a0276c5989ee73d0072808ff4c3`,
+  CUDA Toolkit 12.8.1, architecture 8.6, WITH_FLASH_ATTN=ON, CPU RUY.
+- Ajout d'une sonde exportée par la DLL pour vérifier le macro de compilation natif ;
+  cette sonde ne démontre pas l'exécution des kernels sur une RTX.
+- Workflow expérimental : compilation puis tests sur runner frais, inférence CPU réelle,
+  installation séparée et contrôles du programme empaqueté avant éventuelle publication.
+- Local : deux tests de la sonde et Ruff réussis, YAML expérimental valide.
+  Compilation native Windows et fonctionnement GPU non encore vérifiés.
+- Les réunions et modèles sont partagés sous le verrou d'instance habituel. L'installateur
+  expérimental utilise un AppId et un dossier distincts, sans remplacer la version normale.
+- Aucune release Flash déclarée fonctionnelle avant les résultats de compilation/tests.

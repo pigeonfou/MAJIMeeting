@@ -1,0 +1,159 @@
+name: Flash Windows experiment
+on:
+  push:
+    branches: [experiment/windows-flash]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: flash-experiment-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-wheel:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/cache@v4
+        id: wheel
+        with:
+          path: flash-wheel
+          key: ct2-flash-win2022-cp311-sm86-${{ hashFiles('packaging/flash/build.ps1', 'packaging/flash/prepare_source.py') }}
+      - name: Checkout exact upstream engine and submodules
+        if: steps.wheel.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: OpenNMT/CTranslate2
+          ref: 5de572ef60b67a0276c5989ee73d0072808ff4c3
+          path: vendor-ct2
+          submodules: recursive
+          persist-credentials: false
+      - name: Install CUDA compiler without a GPU driver
+        if: steps.wheel.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path $env:RUNNER_TEMP 'cuda-build.exe'
+          Invoke-WebRequest https://developer.download.nvidia.com/compute/cuda/12.8.1/local_installers/cuda_12.8.1_572.61_windows.exe -OutFile $installer
+          $process = Start-Process $installer -ArgumentList @('-s', 'nvcc_12.8', 'cudart_12.8', 'cublas_dev_12.8', 'curand_dev_12.8') -PassThru -Wait
+          if ($process.ExitCode -notin @(0, 3010)) { throw "CUDA installation failed: $($process.ExitCode)" }
+          Remove-Item $installer
+          & 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/bin/nvcc.exe' --version
+          if ($LASTEXITCODE -ne 0) { throw 'CUDA compiler unavailable' }
+      - name: Compile the Flash-enabled native engine and Python wheel
+        if: steps.wheel.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./packaging/flash/build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CT2-Flash-Windows-wheel
+          path: flash-wheel
+          if-no-files-found: error
+      - name: Native build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CT2-Flash-build-diagnostics
+          path: |
+            ct2-build/CMakeCache.txt
+            ct2-build/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+  package:
+    needs: native-wheel
+    runs-on: windows-2022
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - uses: actions/download-artifact@v4
+        with:
+          name: CT2-Flash-Windows-wheel
+          path: flash-wheel
+      - name: Install application and experimental wheel
+        shell: pwsh
+        run: |
+          python -m pip install -e ".[dev]" 'pyinstaller>=6.11,<7'
+          if ($LASTEXITCODE -ne 0) { throw 'Application dependency installation failed' }
+          $wheels = @(Get-ChildItem flash-wheel/*.whl)
+          if ($wheels.Count -ne 1) { throw 'Expected one experimental wheel' }
+          python -m pip install --force-reinstall --no-deps $wheels[0].FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Custom wheel installation failed' }
+      - name: Verify compiled native flag on a fresh runner
+        run: python packaging/flash/verify_native.py
+      - name: Application tests
+        run: python -m pytest -q
+      - name: Application and packaging lint
+        run: python -m ruff check .
+      - name: Real model download and CPU inference with custom engine
+        shell: pwsh
+        run: |
+          python -m majimeeting --download-smoke test-model
+          if ($LASTEXITCODE -ne 0) { throw 'Model download failed' }
+          $env:HF_HUB_OFFLINE = '1'
+          python -m majimeeting --inference-smoke test-model
+          if ($LASTEXITCODE -ne 0) { throw 'Native CPU inference failed' }
+      - name: Build the separate experimental executable
+        run: python -m PyInstaller --noconfirm --clean --windowed --name MAJIMeeting-Flash --paths src --collect-all pyaudiowpatch --collect-all faster_whisper --collect-all ctranslate2 --collect-all av --collect-all onnxruntime --collect-all tokenizers --collect-all huggingface_hub packaging/windows_flash_entry.py
+      - name: Build the separate experimental installer
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
+          if (-not (Test-Path $compiler)) { choco install innosetup --yes --no-progress }
+          & $compiler packaging/flash/installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+      - name: Install and verify the packaged native flag and inference
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-Flash-installed'
+          $setup = Start-Process dist/MAJIMeeting-0.2.6-Flash-Experimental-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          if ($setup.ExitCode -ne 0) { throw 'Experimental installation failed' }
+          $env:HF_HUB_OFFLINE = '1'
+          $app = Join-Path $target 'MAJIMeeting-Flash.exe'
+          foreach ($flag in @('--flash-build-check', '--smoke-test', '--editor-smoke')) {
+            $check = Start-Process $app -ArgumentList $flag -PassThru
+            if (-not $check.WaitForExit(30000)) { $check.Kill(); throw "Timeout: $flag" }
+            if ($check.ExitCode -ne 0) { throw "Check failed: $flag" }
+          }
+          $model = (Resolve-Path test-model).Path
+          $check = Start-Process $app -ArgumentList @('--inference-smoke', $model) -PassThru
+          if (-not $check.WaitForExit(240000)) { $check.Kill(); throw 'Installed inference timeout' }
+          if ($check.ExitCode -ne 0) { throw 'Installed inference failed' }
+      - name: Record installer integrity
+        shell: pwsh
+        run: |
+          $file = Get-Item dist/MAJIMeeting-0.2.6-Flash-Experimental-Setup.exe
+          $digest = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$digest  $($file.Name)" | Set-Content dist/FLASH-SHA256.txt -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MAJIMeeting-Flash-Experimental
+          path: |
+            dist/MAJIMeeting-0.2.6-Flash-Experimental-Setup.exe
+            dist/FLASH-SHA256.txt
+          if-no-files-found: error
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MAJIMeeting-Flash-Experimental
+          path: release-assets
+      - name: Publish the experimental installer only after checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLASH_TAG: flash-v0.2.6-exp.${{ github.run_number }}
+        run: |
+          gh release create "$FLASH_TAG" release-assets/* --target "$GITHUB_SHA" --prerelease --title "MAJIMeeting Flash — essai RTX 3080 $FLASH_TAG" --notes-file docs/FLASH_BUILD.md
