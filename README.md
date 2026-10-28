@@ -37,3 +37,10 @@ démarrage. Il est fourni comme artefact de workflow ; cela ne valide pas les p�
 physiques. Aucun modèle IA n'est encore intégré. L'application fonctionne localement.
 
 Voir [la progression](docs/PROGRESS.md) et [les essais Windows](docs/WINDOWS_TESTS.md).
+
+## Transcription locale (jalon 2)
+L'onglet **Import et transcription** permet d'importer un WAV/MP3/FLAC/M4A ou de transcrire
+une réunion enregistrée. Choisir un modèle local faster-whisper (ou télécharger large-v3
+avec le bouton dédié), puis CPU/int8 ou CUDA si les bibliothèques NVIDIA sont installées.
+La transcription française est horodatée, persistante, consultable et exportable TXT/JSON.
+Voir [le guide de transcription](docs/TRANSCRIPTION.md) pour les essais et limites.

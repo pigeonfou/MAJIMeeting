@@ -1,19 +1,22 @@
-# MAJIMeeting — préversion du jalon 1
+# MAJIMeeting — préversion du jalon 2
 
-Installateur Windows x64 sans droits administrateur, avec raccourcis et désinstallation.
+Installateur Windows x64, sans droits administrateur. Conserve les réunions existantes.
 
-Fonctions : capture WASAPI de plusieurs entrées microphone/audio système loopback,
-pistes séparées, fragments WAV récupérables, catalogue des réunions, export WAV,
-interface native et thèmes clair/sombre.
+Nouveautés : import WAV/MP3/FLAC/M4A, transcription française locale faster-whisper,
+choix CPU/CUDA et quantification, gestion du modèle large-v3, progression/annulation,
+historique persistant des transcriptions et export TXT/JSON horodaté.
 
-Contrôles automatisés préalables : tests Python Linux/Windows, Ruff, démarrage Qt,
-construction PyInstaller, installation silencieuse et démarrage du programme installé.
+Le modèle large-v3 est téléchargé séparément depuis l'application (~3 Go).
+Les bibliothèques CUDA/cuDNN ne sont pas incluses ; CPU/int8 fonctionne sans NVIDIA.
+Après installation du modèle, les traitements sont locaux et sans téléchargement implicite.
 
-**Capture matérielle non validée.** Cette préversion sert aux essais sur Windows ;
-elle n'est pas destinée à l'enregistrement irremplaçable de réunions. Pas de signature
-de code. Transcription, diarisation et comptes rendus ne sont pas encore intégrés.
-La synchronisation précise et la dérive entre périphériques restent à valider.
+La capture microphone/loopback, l'export séparé et la récupération après arrêt forcé ont
+été confirmés par l'utilisateur sur la préversion du jalon 1. Les essais complémentaires
+(débranchement, longue durée/dérive, hors réseau, désinstallation) restent à réaliser.
 
-Installer le fichier `MAJIMeeting-0.1.0-preview-Setup.exe`. Suivre `docs/WINDOWS_TESTS.md`
-dans le dépôt pour la validation microphone/loopback, interruption et réunion longue.
-Les données locales sont conservées après désinstallation.
+Contrôles automatisés : tests Windows/Linux, Ruff, démarrage Qt, inférence CPU avec un
+petit modèle de test, construction/installation et inférence du programme installé.
+Ces contrôles ne valident pas la qualité française de large-v3 ni CUDA sur votre RTX.
+
+Préversion sans signature de code. Diarisation, correction synchronisée et comptes rendus
+ne sont pas encore intégrés. Voir docs/TRANSCRIPTION.md et docs/PROGRESS.md.

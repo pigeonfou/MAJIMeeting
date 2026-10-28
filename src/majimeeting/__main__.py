@@ -1,7 +1,7 @@
 """Native Windows recording interface."""
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from pathlib import Path
 
 from PySide6.QtCore import QLockFile, Qt, QTimer
@@ -17,11 +17,13 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from majimeeting.capture import RecordingSession, WasapiBackend
+from majimeeting.processing_ui import ProcessingPanel
 from majimeeting.storage import MeetingStore, export_track
 
 
@@ -40,7 +42,7 @@ class MainWindow(QMainWindow):
         self.session = None
         self.task = None
         self.pool = ThreadPoolExecutor(max_workers=1)
-        self.setWindowTitle("MAJIMeeting — Enregistrement")
+        self.setWindowTitle("MAJIMeeting — Enregistrement et transcription")
         self.resize(1000, 700)
         body = QWidget()
         layout = QVBoxLayout(body)
@@ -61,7 +63,7 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(False)
         layout.addWidget(self.stop_button)
         self.status = QLabel("Prêt")
-        layout.addWidget(self.status)
+        self.statusBar().addWidget(self.status, 1)
         self.dark = QCheckBox("Thème sombre")
         self.dark.toggled.connect(self.set_theme)
         layout.addWidget(self.dark)
@@ -71,7 +73,12 @@ class MainWindow(QMainWindow):
         self.export_button = QPushButton("Exporter une piste en WAV…")
         self.export_button.clicked.connect(self.export)
         layout.addWidget(self.export_button)
-        self.setCentralWidget(body)
+        tabs = QTabWidget()
+        tabs.addTab(body, 'Enregistrement et réunions')
+        self.processing = ProcessingPanel(self)
+        tabs.addTab(self.processing, 'Import et transcription')
+        self.meetings.currentItemChanged.connect(self.processing.selected)
+        self.setCentralWidget(tabs)
         recovered = self.store.recover()
         self.reload_meetings()
         if recovered:
@@ -91,6 +98,7 @@ class MainWindow(QMainWindow):
         )
 
     def busy(self, active):
+        self.processing.set_busy(active)
         for widget in (self.title, self.devices, self.refresh, self.start_button,
                        self.export_button):
             widget.setEnabled(not active)
@@ -130,6 +138,7 @@ class MainWindow(QMainWindow):
             self.status.setText("Finalisation des pistes…")
 
     def poll(self):
+        self.processing.poll_progress()
         if self.task and self.task[1].done():
             kind, future = self.task
             self.task = None
@@ -146,11 +155,29 @@ class MainWindow(QMainWindow):
                         item.setCheckState(Qt.CheckState.Unchecked)
                         self.devices.addItem(item)
                     self.status.setText("Sélectionnez vos sources audio.")
+                elif kind == 'import':
+                    self.reload_meetings()
+                    for i in range(self.meetings.count()):
+                        if self.meetings.item(i).data(Qt.ItemDataRole.UserRole) == result:
+                            self.meetings.setCurrentRow(i)
+                            break
+                    self.status.setText('Import terminé. Réunion sélectionnée pour transcription.')
+                elif kind == 'transcribe':
+                    self.status.setText('Transcription terminée.')
+                elif kind == 'download':
+                    self.status.setText('Modèle installé. La transcription fonctionne hors ligne.')
                 else:
                     self.status.setText("Piste exportée.")
+            except CancelledError:
+                self.status.setText('Traitement annulé ; résultats partiels conservés.')
+                if kind == 'import':
+                    self.reload_meetings()
             except Exception as exc:
                 self.status.setText(str(exc))
+                if kind == 'import':
+                    self.reload_meetings()
                 QMessageBox.warning(self, "MAJIMeeting", str(exc))
+            self.processing.reload()
         if self.session and self.session.done.is_set():
             error = self.session.error
             self.session.thread.join()
@@ -193,6 +220,9 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    if '--inference-smoke' in sys.argv:
+        from majimeeting.selftest import inference_smoke
+        return inference_smoke(sys.argv[sys.argv.index('--inference-smoke') + 1])
     app = QApplication(sys.argv)
     app.setApplicationName("MAJIMeeting")
     root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "MAJIMeeting" / "data"
