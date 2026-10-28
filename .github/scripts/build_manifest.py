@@ -13,7 +13,7 @@ def git_value(expression):
 
 
 def main():
-    version = tomllib.loads(Path('pyproject.toml').read_text())['project']['version'].split('.dev')[0]
+    version = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'].split('.dev')[0]
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise ValueError('Invalid release version')
     installer = Path('dist') / f'MAJIMeeting-{version}-preview-Setup.exe'
@@ -21,7 +21,7 @@ def main():
     with installer.open('rb') as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b''):
             digest.update(chunk)
-    event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+    event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
     manifest = {'schema': 1, 'repository': os.environ['GITHUB_REPOSITORY'],
                 'source_commit': git_value('HEAD'), 'source_tree': git_value('HEAD^{tree}'),
                 'run_id': int(os.environ['GITHUB_RUN_ID']),
