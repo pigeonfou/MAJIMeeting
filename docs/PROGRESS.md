@@ -296,8 +296,6 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Prochain essai utilisateur : même réunion, CUDA et quantification identiques, comparer
   séquentiel puis lots de 8 en Qualité ; vérifier durée et passages. Rapide et float16 à
   comparer séparément. Les métriques ne certifient pas l'exactitude du texte reconnu.
-
-
 ## Revalidation 0.2.5 et mesures RTX fournies par l'utilisateur
 
 Le 28 octobre 2026, nouvelles captures de la même durée source : 1504,4 secondes-pistes.
@@ -333,3 +331,26 @@ séquentiel relevé ; vérifier texte et avertissements avant de le retenir par 
   à deux workers GPU réalisé. Ces pistes ne sont pas intégrées dans 0.2.5.
 - Aucun code ni installateur modifié pour cette revalidation. Les autres essais matériels
   reportés gardent leur statut.
+
+
+## Préparation des essais GPU avancés — 0.2.6
+
+- Clarification utilisateur : demande d'une nouvelle version à tester, pas d'un contrôle
+  supplémentaire de 0.2.5. Base main `83a3234e6acd6be139c7c42eb552221ee5a567c4`.
+- Options Flash Attention et deux workers désactivées par défaut ; deux workers natifs CT2
+  partagent les mêmes poids, pipelines indépendants, requêtes réellement concurrentes.
+- Deux fenêtres maximum, WAV isolés et nettoyage après fin des tâches ; retour prioritaire
+  à un worker si VRAM insuffisante. Reprise sans Flash sur erreur explicitement liée à Flash.
+- Fenêtres 5/10 minutes, lots jusqu'à 32, mesure des tailles natives et du remplissage.
+  Temps cumulés des workers explicités ; mode effectif et adaptations visibles.
+- Local : 75 tests réussis, Ruff, démarrage Qt et éditeur/décodage audio réussis.
+  Vrais poids tiny : décodage concurrent sur deux workers CPU, VAD et chemin de production
+  parallèle réussis. Les kernels Flash et le GPU RTX ne sont pas disponibles ici.
+- Plantage Qt reproduit dans la suite au changement de thème ; nettoyage explicite des
+  fenêtres natives entre tests ajouté. Suite complète réussie après correction.
+- Interruption temporaire de l'environnement de développement pendant les notes de release,
+  puis reprise des mêmes fichiers. Aucun résultat Windows présumé de ce fait.
+- CI Windows/Linux et tests du programme installé à vérifier avant publication.
+- À réaliser sur RTX : Flash/compatibilité, deux workers, remplissage, VRAM, stabilité,
+  annulation et qualité des mêmes passages. Aucun gain RTX présumé.
+- Essais J1 reportés et suite J3 pyannote à réaliser ; validations 0.2.4 conservées.

@@ -169,7 +169,7 @@ def test_non_gpu_failure_does_not_retry_batched_decode(tmp_path):
     assert calls == [1]
 
 
-@pytest.mark.parametrize('changes', [{'batch_size': 0}, {'batch_size': 32}, {'beam_size': 2}])
+@pytest.mark.parametrize('changes', [{'batch_size': 0}, {'batch_size': 64}, {'beam_size': 2}])
 def test_invalid_batch_settings_do_not_start_job(tmp_path, changes):
     store = MeetingStore(tmp_path / 'data')
     meeting = recorded(store)

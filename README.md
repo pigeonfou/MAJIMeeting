@@ -53,3 +53,7 @@ attribution manuelle des noms et historique. La diarisation automatique reste à
 
 La préversion 0.2.5 ajoute le [traitement par lots GPU et les mesures de vitesse](docs/PERFORMANCE.md).
 Les profils Qualité/Rapide et le chemin séquentiel sont proposés pour comparer la même réunion.
+
+La préversion 0.2.6 propose [des essais GPU avancés](docs/GPU_EXPERIMENTS.md) : Flash Attention,
+deux workers partageant le modèle, fenêtres de dix minutes et mesure du remplissage réel.
+Ces options expérimentales sont à comparer séparément sur le PC utilisateur.
