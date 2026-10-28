@@ -3,7 +3,8 @@
 Mise à jour : 28 octobre 2026.
 
 ## État global
-Jalon 2 en validation de qualité ; optimisation GPU 0.2.5 intégrée.
+Jalon 2 en validation de qualité ; optimisation 0.2.5 mesurée sur RTX,
+options expérimentales GPU 0.2.6 intégrées pour essais utilisateur.
 Première partie du jalon 3 (éditeur, noms manuels, historique et réécoute) validée
 par retour utilisateur sur la version 0.2.4. Diarisation automatique à réaliser.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
@@ -350,7 +351,28 @@ séquentiel relevé ; vérifier texte et avertissements avant de le retenir par 
   fenêtres natives entre tests ajouté. Suite complète réussie après correction.
 - Interruption temporaire de l'environnement de développement pendant les notes de release,
   puis reprise des mêmes fichiers. Aucun résultat Windows présumé de ce fait.
-- CI Windows/Linux et tests du programme installé à vérifier avant publication.
+- CI de PR Windows/Linux et tests du programme installé réussis ; références ci-dessous.
 - À réaliser sur RTX : Flash/compatibilité, deux workers, remplissage, VRAM, stabilité,
   annulation et qualité des mêmes passages. Aucun gain RTX présumé.
 - Essais J1 reportés et suite J3 pyannote à réaliser ; validations 0.2.4 conservées.
+
+## Références des essais GPU avancés 0.2.6
+
+- [PR nº 8](https://github.com/pigeonfou/MAJIMeeting/pull/8) fusionnée.
+- Implémentation : `14f8786ceee9076cb974925dcf2a416593a958e9` ; fusion :
+  `672a3d0656c661165b9df6678539a17b47f46c4d`.
+- [CI PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40748261712) réussie :
+  75 tests Windows/Linux, Ruff, démarrage Qt, éditeur/décodage WAV, inférence tiny CPU
+  et décodage natif concurrent sur deux workers réussis.
+- Installateur construit et installé, puis contrôles d'éditeur, téléchargement réel tiny,
+  inférence CPU hors ligne et deux workers depuis le programme installé réussis.
+- Flash CUDA et performance RTX à mesurer par l'utilisateur ; aucun GPU disponible en CI.
+- [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40749010803) réussie :
+  75 tests par système, construction et installation Windows, mêmes contrôles réels
+  CPU/concurrence/éditeur depuis le programme installé réussis.
+- [Préversion v0.2.6-preview.40](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.6-preview.40)
+  publiée le 28 octobre 2026 ; installateur présent et publié. Référence de comparaison :
+  CUDA / float16 / lots 16 / Rapide / 1 worker / fenêtres 5 min / Flash non.
+- À confirmer sur le PC utilisateur : activation Flash réellement acceptée, gain éventuel
+  de deux workers et des grandes fenêtres, VRAM, annulation et qualité. Aucun résultat
+  GPU expérimental déclaré réussi avant ce retour.

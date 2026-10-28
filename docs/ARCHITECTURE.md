@@ -54,9 +54,19 @@ Aucun modèle IA n’est chargé pour éditer ou lire.
 ## Transcription par lots et mesures
 
 Le worker peut encapsuler WhisperModel dans BatchedInferencePipeline sans charger un
-second modèle. La fenêtre audio disque reste bornée à cinq minutes. Un seul pipeline
-et un seul modèle sont conservés par reprise. Un manque explicite de VRAM réduit les
+second modèle. La fenêtre audio disque reste bornée à cinq minutes. Un seul modèle est conservé par reprise. La préversion 0.2.6 peut utiliser
+deux pipelines indépendants avec deux workers natifs partageant ce modèle. Un manque explicite de VRAM réduit les
 lots avant essai du chemin CUDA séquentiel puis éventuel CPU ; les références des
 itérateurs/pipelines sont libérées avant la reprise hors du gestionnaire d’exception.
 Les paramètres demandés, paramètres effectifs et métriques des reprises restent dans
 le JSON `options` des traitements SQLite ; aucune migration destructive.
+
+## Options GPU expérimentales 0.2.6
+
+Les deux threads d’inférence ne partagent pas l’état temporel de leurs pipelines, mais
+partagent les poids du modèle et ses workers CT2. Deux fenêtres WAV isolées au maximum
+sont en vol, avec un WAV de préparation supplémentaire ; arrêt et attente des tâches
+précèdent toute suppression des temporaires ou reprise. Les erreurs mémoire réduisent
+d’abord la concurrence ; une incompatibilité Flash explicite réessaie CUDA sans Flash.
+Le forward natif mesure les tailles effectivement soumises, sans modifier les features.
+Les temps des workers sont cumulés et distingués de la durée totale dans l’interface.

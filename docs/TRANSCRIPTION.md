@@ -113,3 +113,9 @@ La transcription peut désormais grouper les portions de décodage sur GPU, avec
 la taille et du profil de recherche. Les mesures finales figurent dans l'historique.
 Voir [les réglages et le protocole de comparaison](PERFORMANCE.md). Le mode séquentiel,
 les horodatages contrôlés et les corrections restent disponibles.
+
+## Essais GPU avancés — 0.2.6
+
+Les options expérimentales Flash Attention, deux workers, fenêtres de dix minutes et
+remplissage natif des lots sont détaillées dans [GPU_EXPERIMENTS.md](GPU_EXPERIMENTS.md).
+Elles sont à comparer sur le PC utilisateur ; aucune validation Flash CUDA en CI.
