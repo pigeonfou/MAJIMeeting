@@ -3,7 +3,9 @@
 Mise à jour : 28 octobre 2026.
 
 ## État global
-Jalon 2 en validation utilisateur ; première partie du jalon 3 intégrée.
+Jalon 2 en validation de qualité ; optimisation GPU 0.2.5 intégrée.
+Première partie du jalon 3 (éditeur, noms manuels, historique et réécoute) validée
+par retour utilisateur sur la version 0.2.4. Diarisation automatique à réaliser.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
 conservés à réaliser. Aucune release stable validée.
 Le socle initial au commit `32caf8a` a été intégralement relu (neuf fichiers).
@@ -270,7 +272,27 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Local : 70 tests réussis ; tests des paramètres, horodatages, annulation, erreurs non GPU,
   réduction mémoire, absence de doublons et libération avant reprise réussis. Ruff réussi.
 - Test réel tiny CPU par lots (deux requêtes réellement encodées ensemble), VAD et chaîne
-  de production hors ligne réussis en local ; éditeur/décodage Qt réussi. CI et programme
-  Windows installé à vérifier avant publication.
+  de production hors ligne réussis en local ; éditeur/décodage Qt réussi. CI de PR et
+  programme Windows installé validés ; références ci-dessous.
 - Gain RTX 3080/large-v3, qualité française et comparaison float16/int8_float16 à réaliser.
 - Les essais matériels J1 restants demeurent à réaliser. Suite J3 : pyannote Community-1.
+
+## Références de l'optimisation 0.2.5
+
+- [PR nº 7](https://github.com/pigeonfou/MAJIMeeting/pull/7) fusionnée.
+- Implémentation : `36f1d6d5a65c89d924068ef028fff741d66964a4` ; fusion :
+  `6a7fd68216f7a07b2f3d3ba5596eb3d2d2e1fdde`.
+- [CI PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40734280487) réussie :
+  70 tests Windows/Linux, Ruff, démarrage Qt, décodage audio, vrai lot de deux requêtes
+  tiny CPU et VAD hors ligne réussis.
+- Construction, installation, téléchargement réel tiny et contrôles d'inférence par lots,
+  éditeur et décodeur Qt depuis le programme installé réussis.
+- Aucun benchmark de performance RTX ou de qualité large-v3 en CI. Aucun gain chiffré
+  sur le PC utilisateur annoncé avant mesure.
+- [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40735297009) réussie :
+  mêmes tests Windows/Linux et contrôles de l'application Windows installée réussis.
+- [Préversion v0.2.5-preview.37](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.5-preview.37)
+  publiée le 28 octobre 2026 ; installateur Windows disponible et artefact vérifié présent.
+- Prochain essai utilisateur : même réunion, CUDA et quantification identiques, comparer
+  séquentiel puis lots de 8 en Qualité ; vérifier durée et passages. Rapide et float16 à
+  comparer séparément. Les métriques ne certifient pas l'exactitude du texte reconnu.
