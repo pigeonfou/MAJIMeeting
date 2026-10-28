@@ -50,3 +50,6 @@ Voir [le guide de transcription](docs/TRANSCRIPTION.md) pour les essais et limit
 
 La préversion 0.2.4 ajoute [les corrections et la réécoute](docs/EDITOR.md), avec
 attribution manuelle des noms et historique. La diarisation automatique reste à intégrer.
+
+La préversion 0.2.5 ajoute le [traitement par lots GPU et les mesures de vitesse](docs/PERFORMANCE.md).
+Les profils Qualité/Rapide et le chemin séquentiel sont proposés pour comparer la même réunion.

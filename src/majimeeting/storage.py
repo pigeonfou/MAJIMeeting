@@ -88,17 +88,27 @@ class MeetingStore:
             db.execute("UPDATE transcription_jobs SET status=?,error=? WHERE id=?",
                        (state, error, job))
 
-    def set_execution(self, job, device, compute_type, fallback_reason='', reset_segments=False):
+    def set_execution(self, job, device, compute_type, fallback_reason='', reset_segments=False,
+                      batched=False, batch_size=1, beam_size=5):
         with self.connect() as db:
             row = db.execute('SELECT options FROM transcription_jobs WHERE id=?', (job,)).fetchone()
             if row is None:
                 raise ValueError('Traitement introuvable.')
             options = json.loads(row['options'])
             options['execution'] = {'device': device, 'compute_type': compute_type,
-                                    'fallback_reason': fallback_reason}
+                                    'fallback_reason': fallback_reason, 'batched': batched,
+                                    'batch_size': batch_size, 'beam_size': beam_size}
             if reset_segments:
                 db.execute('DELETE FROM transcript_segments WHERE job_id=?', (job,))
                 db.execute('DELETE FROM transcription_warnings WHERE job_id=?', (job,))
+            db.execute('UPDATE transcription_jobs SET options=? WHERE id=?',
+                       (json.dumps(options), job))
+
+    def set_transcription_metrics(self, job, metrics):
+        with self.connect() as db:
+            row = db.execute('SELECT options FROM transcription_jobs WHERE id=?', (job,)).fetchone()
+            options = json.loads(row['options'])
+            options['metrics'] = metrics
             db.execute('UPDATE transcription_jobs SET options=? WHERE id=?',
                        (json.dumps(options), job))
 

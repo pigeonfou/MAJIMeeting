@@ -7,11 +7,16 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from faster_whisper import WhisperModel
+from faster_whisper import BatchedInferencePipeline, WhisperModel
 
 from majimeeting.cuda_runtime import CudaUnavailableError
 from majimeeting.storage import FragmentWriter, MeetingStore
-from majimeeting.transcription import TranscriptionOptions, import_audio, transcribe_meeting
+from majimeeting.transcription import (
+    TranscriptionOptions,
+    import_audio,
+    normalize_timestamps,
+    transcribe_meeting,
+)
 
 
 def inference_smoke(model_path):
@@ -20,6 +25,31 @@ def inference_smoke(model_path):
     segments, _ = model.transcribe(np.zeros(16000, dtype=np.float32), language='fr',
                                    vad_filter=False, beam_size=1)
     list(segments)
+    # Exercise a real batch of two decoder requests, even though silence is removed by VAD.
+    pipeline = BatchedInferencePipeline(model=model)
+    batch_shapes = []
+    original_encode = model.encode
+
+    def counted_encode(features, *args, _encode=original_encode, **kwargs):
+        batch_shapes.append(features.shape[0])
+        return _encode(features, *args, **kwargs)
+
+    model.encode = counted_encode
+    batch_segments, info = pipeline.transcribe(
+        np.zeros(32 * 16000, dtype=np.float32), language='fr', beam_size=1,
+        batch_size=2, vad_filter=False, without_timestamps=False,
+        clip_timestamps=[{'start': 0, 'end': 1}, {'start': 31, 'end': 32}])
+    decoded = list(batch_segments)
+    assert batch_shapes == [2], batch_shapes
+    assert info.transcription_options.without_timestamps is False
+    # Raw Whisper timestamps may extend into padding, as in the 0.2.3 regression.
+    # Apply the production guard rather than requiring perfect timestamps from silence.
+    for segment in decoded:
+        bounds, _ = normalize_timestamps(segment.start, segment.end, 32)
+        if bounds is not None:
+            assert 0 <= bounds[0] < bounds[1] <= 32
+    model.encode = original_encode
+    del pipeline, original_encode, counted_encode, batch_segments, segments
     del model
     with tempfile.TemporaryDirectory(prefix='majimeeting-selftest-') as temp:
         folder = Path(temp)
@@ -34,6 +64,13 @@ def inference_smoke(model_path):
         job = transcribe_meeting(store, meeting, TranscriptionOptions(model_path))
         assert store.transcription_jobs(meeting)[0]['status'] == 'completed'
         assert not store.segments(job), 'Silence must not produce a transcript with VAD enabled'
+        batched_job = transcribe_meeting(store, meeting, replace(
+            TranscriptionOptions(model_path), batched=True, batch_size=2, beam_size=1))
+        assert store.transcription_jobs(meeting)[0]['status'] == 'completed'
+        assert not store.segments(batched_job)
+        batch_details = json.loads(store.transcription_jobs(meeting)[0]['options'])
+        assert batch_details['execution']['batched'] is True
+        assert batch_details['metrics']['attempts'][0]['completed_audio_seconds'] == 3
         # Reproduce the reported missing-cuBLAS failure, then use the real CPU engine.
         def missing_cublas(path):
             raise CudaUnavailableError('cublas64_12.dll is not found or cannot be loaded')

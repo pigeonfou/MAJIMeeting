@@ -254,3 +254,23 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - À confirmer sur le PC utilisateur : réécoute audible et correspondance texte/piste,
   corrections après mise à jour, fonctionnement hors réseau et fin de transcription large-v3.
   Les essais J1 reportés restent à réaliser. La diarisation automatique n'est pas intégrée.
+
+## Retour utilisateur et optimisation GPU — 28 octobre 2026
+
+- Utilisateur : « Les intégrations de la version 0.2.4 sont validées ». Éditeur, noms manuels,
+  historique et réécoute considérés validés sur son PC. Ce retour ne valide pas à lui seul
+  les essais J1 reportés, la qualité complète large-v3 ou la future diarisation automatique.
+- Optimisation de transcription autorisée avant la suite J3 : traitement par lots GPU,
+  taille 8 proposée, profil Qualité beam 5 conservé et profil Rapide beam 1 optionnel.
+- Mode séquentiel conservé ; réduction graduelle des lots en cas d'erreur mémoire GPU,
+  libération du pipeline avant reprise et remplacement des seuls résultats de cette tentative.
+- Métriques enregistrées par reprise : chargement, préparation, inférence/VAD, écriture,
+  durée totale et secondes-pistes terminées. Affichage et export JSON ; aucune estimation
+  de performances antérieures ou de gain RTX non mesuré.
+- Local : 70 tests réussis ; tests des paramètres, horodatages, annulation, erreurs non GPU,
+  réduction mémoire, absence de doublons et libération avant reprise réussis. Ruff réussi.
+- Test réel tiny CPU par lots (deux requêtes réellement encodées ensemble), VAD et chaîne
+  de production hors ligne réussis en local ; éditeur/décodage Qt réussi. CI et programme
+  Windows installé à vérifier avant publication.
+- Gain RTX 3080/large-v3, qualité française et comparaison float16/int8_float16 à réaliser.
+- Les essais matériels J1 restants demeurent à réaliser. Suite J3 : pyannote Community-1.
