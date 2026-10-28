@@ -98,3 +98,76 @@ def timestamp_boundary_smoke(store, options, model_factory=None):
     assert warnings[1]['text'] == 'Texte du padding sans source audio'
     return job
 
+
+
+def editor_smoke():
+    """Exercise editor persistence and Qt WAV decoding without a physical sound device."""
+    import math
+    import struct
+    import tempfile
+    from pathlib import Path
+
+    from PySide6.QtCore import QEventLoop, QTimer, QUrl
+    from PySide6.QtMultimedia import QAudioDecoder
+    from PySide6.QtWidgets import QApplication
+
+    from majimeeting.editor_ui import TranscriptEditor
+    from majimeeting.playback import make_excerpt
+    from majimeeting.storage import FragmentWriter, MeetingStore
+    from majimeeting.transcription import TranscriptionOptions
+
+    app = QApplication.instance() or QApplication([])
+    with tempfile.TemporaryDirectory(prefix='majimeeting-editor-test-') as directory:
+        folder = Path(directory)
+        store = MeetingStore(folder / 'data')
+        meeting = store.create('Editor integration smoke')
+        track = store.root / meeting / 'track-00'
+        writer = FragmentWriter(track, 16000, 1, {})
+        pcm = b''.join(struct.pack('<h', int(3000 * math.sin(i * 440 * 2 * math.pi / 16000)))
+                       for i in range(16000))
+        writer.write(pcm, 1)
+        writer.close()
+        store.finish(meeting, 'completed')
+        store.start_transcription('editor-smoke', meeting, TranscriptionOptions('unused'))
+        store.add_segment('editor-smoke', 'track-00', 1.2, 1.7, 'Original')
+        store.finish_transcription('editor-smoke', 'completed')
+        editor = TranscriptEditor(store, 'editor-smoke')
+        editor.show()
+        editor.text.setPlainText('Texte corrigé')
+        editor.speaker.setText('Alice')
+        editor.save_edit()
+        assert store.segments('editor-smoke')[0]['speaker'] == 'Alice'
+        editor.accept()
+        app.processEvents()
+        path = folder / 'excerpt.wav'
+        assert make_excerpt(track, 1.2, 1.7, path) == .5
+        loop = QEventLoop()
+        decoder = QAudioDecoder()
+        buffers, errors = [], []
+
+        def consume():
+            buffer = decoder.read()
+            if buffer.isValid():
+                buffers.append(buffer.frameCount())
+
+        def failed(*_):
+            errors.append(decoder.errorString())
+            loop.quit()
+
+        decoder.bufferReady.connect(consume)
+        decoder.finished.connect(loop.quit)
+        decoder.error.connect(failed)
+        decoder.setSource(QUrl.fromLocalFile(str(path)))
+        timeout = QTimer()
+        timeout.setSingleShot(True)
+        timeout.timeout.connect(loop.quit)
+        timeout.start(15000)
+        decoder.start()
+        loop.exec()
+        decoder.stop()
+        assert timeout.isActive(), 'Qt WAV decoder timed out'
+        timeout.stop()
+        assert not errors, errors
+        assert sum(buffers) == 8000, buffers
+    print('Editor corrections and Qt WAV decoder smoke passed')
+    return 0

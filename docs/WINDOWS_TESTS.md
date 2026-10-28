@@ -46,3 +46,18 @@ mono 48 kHz, 691 Mo/heure en stéréo ; multiplier par le nombre de pistes.
 
 Retour attendu : version Windows, périphériques/pilotes, résultat de chaque essai,
 message exact en cas d'erreur, durée/dérive observée. Ne pas communiquer d'audio confidentiel.
+
+## J3 — éditeur et réécoute (à réaliser sur le PC utilisateur)
+
+1. Installer la préversion 0.2.4 par-dessus l'ancienne ; vérifier l'accès aux réunions.
+2. Ouvrir l'éditeur d'une transcription existante ; corriger une phrase et lui attribuer
+   un nom ; enregistrer, fermer et rouvrir. Vérifier texte, nom, original et historique.
+3. Double-cliquer des passages du début, du milieu et de la fin sur chacune des pistes.
+   Vérifier que le son correspond à la phrase et à la piste ; vérifier Arrêter.
+4. Exporter TXT/JSON : vérifier les corrections et le texte original dans le JSON.
+5. Rétablir l'original : vérifier que la correction précédente reste dans l'historique.
+6. Vérifier ces opérations sans réseau. Pour un segment de plus de 60 s, seule sa première
+   minute est lue dans cette préversion.
+
+Ces essais sont à réaliser ; les tests automatisés de décodage ne remplacent pas une
+écoute sur les périphériques Windows réels.

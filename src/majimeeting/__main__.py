@@ -229,6 +229,9 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    if '--editor-smoke' in sys.argv:
+        from majimeeting.selftest import editor_smoke
+        return editor_smoke()
     if '--download-smoke' in sys.argv:
         from majimeeting.model_download import download_model
         download_model(sys.argv[sys.argv.index('--download-smoke') + 1], model_name='tiny')
