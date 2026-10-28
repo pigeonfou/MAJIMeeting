@@ -38,3 +38,15 @@ Compatibilité CUDA/CTranslate2/pyannote sur Windows ; consommation mémoire ; q
 Les tâches différées partagent un worker série ; aucun modèle n'est chargé pendant la
 capture. La diarisation et la synthèse devront conserver cette exclusivité des modèles.
 La base est enrichie par des créations de tables additives, sans suppression des réunions existantes.
+
+## Éditeur et lecture locale
+
+Les corrections résident dans une table SQLite additive `segment_edits` : segment source,
+date, texte et nom attribué manuellement. La vue courante applique la dernière révision
+sans réécrire le texte original ni les temps. Une nouvelle tentative de transcription
+conserve son propre jeu de segments.
+
+Qt Multimedia lit un extrait WAV temporaire préparé dans un worker dédié. Les positions
+utilisent les métadonnées de chaque fragment, avec silence aux trous, sans assemblage
+de la réunion complète. La durée de lecture est bornée à 60 secondes par passage.
+Aucun modèle IA n’est chargé pour éditer ou lire.

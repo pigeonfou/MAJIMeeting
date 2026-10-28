@@ -3,7 +3,7 @@
 Mise à jour : 28 octobre 2026.
 
 ## État global
-Jalon 2 en validation utilisateur ; première partie du jalon 3 en développement.
+Jalon 2 en validation utilisateur ; première partie du jalon 3 intégrée.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
 conservés à réaliser. Aucune release stable validée.
 Le socle initial au commit `32caf8a` a été intégralement relu (neuf fichiers).
@@ -86,7 +86,7 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Annulation coopérative : attend le chargement modèle ou la fin du segment en cours.
   Téléchargement des poids annulable et reprenable depuis le bouton ; délais réseau explicites.
 - Les imports conservent l'original et décodent la première piste audio en mono 16 kHz.
-- Aucun locuteur identifié : les noms track-XX désignent des sources, pas des personnes.
+- Aucun locuteur détecté automatiquement : les noms track-XX désignent des sources, pas des personnes.
   Noms attribuables manuellement et corrections disponibles ; diarisation et compte rendu à venir.
 - Prototype sans signature de code ; traitement CUDA observé sur le PC utilisateur,
   fin complète et qualité large-v3 encore à confirmer.
@@ -224,7 +224,7 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Lecteur Qt Multimedia : extrait local borné à 60 s, préparation dans un worker,
   conservation des décalages et des trous entre fragments. Aucune dépendance IA chargée.
 - Local : 61 tests réussis ; Ruff réussi ; test réel du décodeur WAV Qt et de l'éditeur
-  réussi sans sortie audio physique. Aucun résultat Windows encore obtenu pour cet ajout.
+  réussi sans sortie audio physique. Validation Windows automatisée obtenue, voir références.
 - CI étendue au décodage Qt et au test de l'éditeur dans le programme Windows installé.
 - À réaliser : écoute et corrections sur le PC utilisateur, tests matériels J1 restants,
   fin complète/qualité de la transcription de la réunion après correctif 0.2.3.
@@ -233,4 +233,24 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Les comptes rendus sourcés, exports documentaires et validation stable restent à réaliser.
 
 - Premier passage CI J3 : import de Qt Multimedia impossible sur le runner Linux
-  faute de `libpulse.so.0`. Ajout explicite de `libpulse0` au workflow ; nouvelle CI requise.
+  faute de `libpulse.so.0`. Ajout explicite de `libpulse0` au workflow ; CI suivante réussie.
+
+## Références de l'éditeur et de la réécoute 0.2.4
+
+- [PR nº 6](https://github.com/pigeonfou/MAJIMeeting/pull/6) fusionnée.
+- Implémentation : `351dedc3693dea93d0ee86c3469cbcf5ed21c8ff` ; correctif CI :
+  `0de531a9f20de558136fa20d752d313579c64ba2` ; arrêt de lecture au changement de
+  passage : `040c6cb327496f44004afced7f3e06915f49c56e`.
+- Fusion main : `b16eedc334ee328ecee906e2ce73364224160797`.
+- [CI PR](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40729013896) réussie :
+  61 tests Windows et Linux, Ruff, démarrage Qt, décodage WAV Qt et corrections persistantes,
+  téléchargement réel du modèle tiny et inférence CPU hors ligne.
+- Construction, installation, contrôles de l'éditeur/décodeur Qt et inférence CPU depuis
+  le programme Windows installé réussis. Aucun test de sortie audio physique en CI.
+- [CI main](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40730116754) réussie :
+  même validation Windows/Linux, installation et tests du programme installé réussis.
+- [Préversion v0.2.4-preview.34](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.4-preview.34)
+  publiée le 28 octobre 2026 ; installateur Windows disponible.
+- À confirmer sur le PC utilisateur : réécoute audible et correspondance texte/piste,
+  corrections après mise à jour, fonctionnement hors réseau et fin de transcription large-v3.
+  Les essais J1 reportés restent à réaliser. La diarisation automatique n'est pas intégrée.

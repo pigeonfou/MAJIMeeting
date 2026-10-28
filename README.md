@@ -10,7 +10,9 @@ Application Windows locale de capture, transcription multi-interlocuteurs et ré
 - Traçabilité des décisions vers les passages horodatés.
 - Export PDF, DOCX, Markdown et TXT.
 
-**Statut :** jalon 2 en validation. Capture partiellement validée sur matériel et transcription locale intégrée ; aucune release stable validée.
+**Statut :** jalon 2 en validation utilisateur, première partie du jalon 3 intégrée.
+Capture partiellement validée sur matériel, transcription locale, corrections et réécoute
+disponibles ; aucune release stable validée.
 
 ## Développement
 Python 3.11+, PySide6, SQLite. Installation de développement :
@@ -20,7 +22,8 @@ py -3.11 -m venv .venv
 pip install -e ".[dev]"
 python -m majimeeting
 ```
-Le téléchargement des modèles et les dépendances CUDA seront intégrés aux jalons ultérieurs.
+Le téléchargement explicite de large-v3 est intégré. Pour CUDA, installer séparément
+les bibliothèques NVIDIA décrites dans [le guide Windows](docs/CUDA_WINDOWS.md).
 
 Voir [l'architecture](docs/ARCHITECTURE.md) et [la feuille de route](docs/ROADMAP.md).
 
