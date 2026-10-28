@@ -3,8 +3,9 @@
 Mise à jour : 28 octobre 2026.
 
 ## État global
-Jalon 2 en validation de qualité ; optimisation 0.2.5 mesurée sur RTX,
-options expérimentales GPU 0.2.6 intégrées pour essais utilisateur.
+Jalon 2 : vitesse et résultats de transcription validés par l'utilisateur sur la réunion
+testée avec la configuration GPU de référence ci-dessous. Validation stable et essais
+matériels reportés toujours à réaliser.
 Première partie du jalon 3 (éditeur, noms manuels, historique et réécoute) validée
 par retour utilisateur sur la version 0.2.4. Diarisation automatique à réaliser.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
@@ -427,3 +428,41 @@ séquentiel relevé ; vérifier texte et avertissements avant de le retenir par 
 - Aucun changement fonctionnel de l'application ; aucune réinstallation nécessaire pour
   bénéficier de cette simplification des futurs builds. Les contrôles restent complets
   si l'arbre fusionné diffère ou si aucun artefact utilisable n'est disponible.
+
+
+## Validation utilisateur de la configuration GPU — 28 octobre 2026
+
+Retour explicite : « les résultats sont bons », après l'essai Rapide à deux workers
+et fenêtres de dix minutes. Résultats jugés satisfaisants sur cette réunion ; aucune
+mesure d'erreur de transcription ni validation universelle de toutes les réunions déduite.
+
+Configuration de référence retenue pour ce PC :
+- CUDA / float16 ; traitement par lots, taille maximale 16.
+- Profil Rapide (beam 1), deux workers, fenêtres de 600 secondes.
+- Flash Attention désactivé : le moteur installé l'a refusé lors de l'essai précédent.
+- Référence utilisateur : 1504,4 secondes-pistes en 37,2 secondes ; une tentative,
+  aucun avertissement d'horodatage, cinq lots natifs et 55 portions, remplissage 68,8 %.
+  Chargement 5,5 s, préparation 1,0 s, inférence cumulée 33,5 s, écriture cumulée 1,6 s.
+  Les temps d'inférence des deux workers restent cumulés et non comparables directement
+  à ceux d'un worker unique.
+
+Complément des mesures précédentes en float16, lots 16, Flash non :
+
+| Profil | Workers | Fenêtres | Total | Inférence/VAD | Remplissage |
+|---|---:|---:|---:|---:|---:|
+| Qualité | 1 | 5 min | 84,9 s | 71,6 s | 59,4 % |
+| Qualité | 1 | 10 min | 78,0 s | 70,7 s | 68,8 % |
+| Qualité | 2 | 5 min | 62,1 s | 94,8 s cumulées | 59,4 % |
+| Qualité | 2 | 10 min | 60,6 s | 98,7 s cumulées | 68,8 % |
+| Rapide | 2 | 10 min | 37,2 s | 33,5 s cumulées | 68,8 % |
+
+Les trois essais à fenêtres de dix minutes ci-dessus terminent sans avertissement temporel.
+Un seul relevé par combinaison ; les écarts faibles ne sont pas considérés comme
+statistiquement établis. Le gain du mode Rapide ne constitue pas à lui seul une preuve
+d'exactitude ; le retour utilisateur valide l'acceptabilité du résultat sur cet audio.
+
+Aucun réglage global imposé aux autres PC, aucun changement du code et aucun nouvel
+installateur requis pour consigner ce retour. Réglages déjà mémorisés par l'application.
+Prochaine fonctionnalité : suite du jalon 3, diarisation automatique Community-1 et
+correction des locuteurs détectés. Les essais J1 reportés et les conditions de release
+stable restent à réaliser.

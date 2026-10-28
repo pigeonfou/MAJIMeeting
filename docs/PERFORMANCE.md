@@ -80,3 +80,20 @@ Sur le PC utilisateur : comparer séquentiel puis lots de 8, à modèle/quantifi
 identiques, puis comparer Rapide et float16 séparément. Relever la durée totale et vérifier
 les mêmes passages audio. Les graphiques 3D/vidéo du Gestionnaire des tâches ne mesurent
 pas nécessairement le moteur de calcul utilisé ; sélectionner CUDA/Compute si proposé.
+
+
+## Référence validée par l'utilisateur — 28 octobre 2026
+
+Sur la RTX 3080 Laptop 16 Go, l'utilisateur juge bons les résultats obtenus avec
+**CUDA / float16 / lots 16 / Rapide / deux workers / fenêtres dix minutes / Flash non**.
+La réunion de 1504,4 secondes-pistes est traitée en **37,2 secondes**, avec cinq lots,
+55 portions, 68,8 % de remplissage et aucun avertissement d'horodatage.
+
+Les essais Qualité de référence donnent 84,9 s (un worker, cinq minutes) et 60,6 s
+(deux workers, dix minutes). Flash a été demandé puis désactivé automatiquement car
+refusé par le moteur installé ; aucun gain Flash mesuré. Les options avancées et
+l'interprétation des temps cumulés sont décrites dans [GPU_EXPERIMENTS.md](GPU_EXPERIMENTS.md).
+
+Cette configuration est une référence pour ce PC et cet audio, pas un nouveau réglage
+imposé à toutes les installations. Les résultats de vitesse proviennent des captures
+utilisateur, et la validation de qualité de son retour explicite ; aucun score WER calculé.
