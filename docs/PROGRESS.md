@@ -231,3 +231,6 @@ La branche `develop/recording-foundation` existante a été reprise sans réinit
 - Prochaine partie J3 : pyannote Community-1 local, gestion des locuteurs détectés et
   chevauchements. Aucun intervenant n'est détecté automatiquement dans cette préversion.
 - Les comptes rendus sourcés, exports documentaires et validation stable restent à réaliser.
+
+- Premier passage CI J3 : import de Qt Multimedia impossible sur le runner Linux
+  faute de `libpulse.so.0`. Ajout explicite de `libpulse0` au workflow ; nouvelle CI requise.
