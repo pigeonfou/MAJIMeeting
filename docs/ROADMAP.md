@@ -9,3 +9,4 @@
 
 ## Conditions de release
 Tests automatisés réussis ; tests manuels audio ; vérification hors ligne ; mesures GPU ; installateur testé sur Windows propre. Ne pas publier de release « stable » avant ces vérifications.
+

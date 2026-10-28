@@ -10,7 +10,7 @@ Application Windows locale de capture, transcription multi-interlocuteurs et ré
 - Traçabilité des décisions vers les passages horodatés.
 - Export PDF, DOCX, Markdown et TXT.
 
-**Statut :** amorçage du projet. Aucune release Windows validée à ce stade.
+**Statut :** jalon 1 en développement. Prototype d'enregistrement ; aucune release stable validée.
 
 ## Développement
 Python 3.11+, PySide6, SQLite. Installation de développement :
@@ -23,3 +23,17 @@ python -m majimeeting
 Le téléchargement des modèles et les dépendances CUDA seront intégrés aux jalons ultérieurs.
 
 Voir [l'architecture](docs/ARCHITECTURE.md) et [la feuille de route](docs/ROADMAP.md).
+
+
+## Prototype d'enregistrement (jalon 1)
+Sous Windows, sélectionnez une ou plusieurs sources WASAPI, donnez un titre à la réunion
+et démarrez. Les microphones et sorties système loopback restent sur des pistes séparées.
+Arrêtez avant de fermer l'application. L'historique permet d'exporter une piste en WAV.
+Les réunions interrompues sont repérées au redémarrage et leurs fragments finalisés restent
+exportables. Les données sont dans `%LOCALAPPDATA%\MAJIMeeting\data`.
+
+La CI construit un installateur Windows de préversion et vérifie son installation et son
+démarrage. Il est fourni comme artefact de workflow ; cela ne valide pas les périphériques
+physiques. Aucun modèle IA n'est encore intégré. L'application fonctionne localement.
+
+Voir [la progression](docs/PROGRESS.md) et [les essais Windows](docs/WINDOWS_TESTS.md).

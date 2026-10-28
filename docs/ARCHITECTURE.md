@@ -24,3 +24,4 @@ Meeting -> AudioTrack ; Meeting -> Speaker ; Meeting -> Segment (start/end/text/
 
 ## Décisions à valider par des essais
 Compatibilité CUDA/CTranslate2/pyannote sur Windows ; consommation mémoire ; qualité WER/DER sur français technique ; capture simultanée microphone et loopback ; packaging PyInstaller.
+
