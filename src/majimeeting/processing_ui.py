@@ -4,7 +4,7 @@ import queue
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from majimeeting.runtime_context import application_settings, shared_models
 from majimeeting.speaker_overview import speaker_display
 from majimeeting.transcription import (
     TranscriptionOptions,
@@ -43,7 +44,7 @@ class ProcessingPanel(QWidget):
         self.window = window
         self.cancel = threading.Event()
         self.messages = queue.Queue(maxsize=1)
-        self.settings = QSettings('MAJIMeeting', 'MAJIMeeting')
+        self.settings = application_settings()
         self.current_meeting = None
         layout = QVBoxLayout(self)
         self.selection = QLabel('Sélectionnez une réunion dans l’onglet Enregistrement.')
@@ -56,7 +57,7 @@ class ProcessingPanel(QWidget):
         layout.addWidget(self.import_button)
         layout.addWidget(QLabel('Modèle faster-whisper local (large-v3 recommandé)'))
         self.model = QLineEdit(str(self.settings.value('model', str(
-            window.store.root.parent / 'models' / 'large-v3'))))
+            shared_models() / 'large-v3'))))
         layout.addWidget(self.model)
         self.browse = QPushButton('Choisir le dossier du modèle…')
         self.browse.clicked.connect(self.choose_model)

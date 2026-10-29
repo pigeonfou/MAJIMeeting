@@ -57,3 +57,10 @@ Les profils Qualité/Rapide et le chemin séquentiel sont proposés pour compare
 La préversion 0.2.6 propose [des essais GPU avancés](docs/GPU_EXPERIMENTS.md) : Flash Attention,
 deux workers partageant le modèle, fenêtres de dix minutes et mesure du remplissage réel.
 Ces options expérimentales sont à comparer séparément sur le PC utilisateur.
+
+
+## Canal Windows DEV sans compilation
+
+Pour les essais fréquents, le canal DEV exécute les sources dans un environnement Python permanent. Il dispose de données et réglages séparés, de mises à jour vérifiées et d'un retour à la version précédente. Aucun Git ni terminal nécessaire après l'installation initiale. Les modèles locaux existants sont réutilisables.
+
+Télécharger `MAJIMeeting-DEV-Setup.zip` dans une release **MAJIMeeting DEV**, extraire puis lancer `Installer-DEV.cmd`. Voir [Installation et fonctionnement du canal DEV](docs/DEV_CHANNEL.md). Les installateurs classiques restent disponibles pour les versions de distribution.

@@ -6,7 +6,7 @@ import threading
 from concurrent.futures import CancelledError, ThreadPoolExecutor
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -26,7 +26,8 @@ from PySide6.QtWidgets import (
 )
 
 from majimeeting.diarization_controls import DiarizationControls
-from majimeeting.diarization_setup import download_community, install_dependencies
+from majimeeting.diarization_setup import default_runtime, download_community, install_dependencies
+from majimeeting.runtime_context import application_settings
 
 
 class DiarizationDialog(QDialog):
@@ -41,7 +42,7 @@ class DiarizationDialog(QDialog):
         self.cancel = threading.Event()
         self.messages = queue.Queue(maxsize=200)
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='majimeeting-setup')
-        self.settings = QSettings('MAJIMeeting', 'MAJIMeeting')
+        self.settings = application_settings()
         root = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MAJIMeeting'
         initial = initial or {}
         root_layout = QVBoxLayout(self)
@@ -88,7 +89,7 @@ class DiarizationDialog(QDialog):
         label.setWordWrap(True)
         layout.addWidget(label)
         layout.addWidget(QLabel('Python du runtime de diarisation :'))
-        self.python = QLineEdit(str(initial.get('python', self.settings.value('diarization_python', root / 'runtime/Scripts/python.exe'))))
+        self.python = QLineEdit(str(initial.get('python', self.settings.value('diarization_python', default_runtime() / 'Scripts/python.exe'))))
         layout.addWidget(self.python)
         self.browse = QPushButton('Choisir python.exe…')
         self.browse.clicked.connect(self.choose_python)
