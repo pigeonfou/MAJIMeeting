@@ -152,7 +152,8 @@ def test_parallel_user_cancel_never_restarts_gpu_or_cpu(tmp_path):
     assert store.transcription_jobs(meeting)[0]['status'] == 'cancelled'
 
 
-def test_experimental_controls_submit_and_report_actual_batch_sizes(tmp_path, monkeypatch):
+@pytest.mark.parametrize('window_seconds', [600, 900, 1200, 1500, 1800])
+def test_experimental_controls_submit_and_report_actual_batch_sizes(tmp_path, monkeypatch, window_seconds):
     from PySide6.QtWidgets import QApplication
 
     from majimeeting.__main__ import MainWindow
@@ -166,7 +167,7 @@ def test_experimental_controls_submit_and_report_actual_batch_sizes(tmp_path, mo
     panel.batched.setChecked(True)
     panel.flash.setChecked(True)
     panel.workers.setCurrentIndex(1)
-    panel.audio_window.setCurrentIndex(1)
+    panel.audio_window.setCurrentIndex(panel.audio_window.findData(window_seconds))
     panel.batch_size.setCurrentText('32')
     submitted = []
     monkeypatch.setattr(panel, 'submit', lambda *args, **kwargs: submitted.append(args))
@@ -174,7 +175,7 @@ def test_experimental_controls_submit_and_report_actual_batch_sizes(tmp_path, mo
     panel.transcribe()
     options = submitted[0][4]
     assert options.flash_attention and options.gpu_workers == 2
-    assert options.window_seconds == 600 and options.batch_size == 32
+    assert options.window_seconds == window_seconds and options.batch_size == 32
     store.start_transcription('report', meeting, options)
     store.finish_transcription('report', 'completed')
     store.set_execution('report', 'cuda', 'float16', batched=True, batch_size=32,

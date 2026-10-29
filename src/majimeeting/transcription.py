@@ -41,7 +41,7 @@ class TranscriptionOptions:
             raise ValueError('Combinaison appareil/quantification non prise en charge.')
         if self.batch_size not in {1, 2, 4, 8, 16, 32} or self.beam_size not in {1, 5}:
             raise ValueError('Taille de lot ou profil de qualité invalide.')
-        if self.gpu_workers not in {1, 2} or self.window_seconds not in {300, 600}:
+        if self.gpu_workers not in {1, 2} or self.window_seconds not in {300, 600, 900, 1200, 1500, 1800}:
             raise ValueError('Configuration expérimentale invalide.')
         if self.gpu_workers == 2 and not self.batched:
             raise ValueError('Deux workers nécessitent le traitement par lots.')

@@ -102,7 +102,16 @@ class ProcessingPanel(QWidget):
         self.audio_window = QComboBox()
         self.audio_window.addItem('Fenêtres de 5 minutes — référence', 300)
         self.audio_window.addItem('Fenêtres de 10 minutes — mieux remplir les grands lots', 600)
-        self.audio_window.setCurrentIndex(1 if self.settings.value('window_seconds', 300, type=int) == 600 else 0)
+        for minutes in (15, 20, 25, 30):
+            self.audio_window.addItem(
+                f'Fenêtres de {minutes} minutes — regroupement pour grands lots', minutes * 60)
+        window_index = self.audio_window.findData(
+            self.settings.value('window_seconds', 300, type=int))
+        self.audio_window.setCurrentIndex(max(0, window_index))
+        self.audio_window.setToolTip(
+            'Une fenêtre plus longue réduit les fins de lots incomplets sur une même piste. '
+            'Elle utilise plus de RAM et peut laisser moins de fenêtres aux deux workers. '
+            'Les coupures audio restent séparées. Comparez durée et transcription.')
         layout.addWidget(self.audio_window)
         self.device_changed(self.device.currentText())
         self.compute.setCurrentText(str(self.settings.value('compute_type', self.compute.currentText())))
