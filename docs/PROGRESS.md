@@ -503,3 +503,13 @@ stable restent à réaliser.
 - [CI PR 40794119935](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40794119935) réussie : tests Windows/Linux, contrôles Qt et inférence, construction et installation Windows. 89 tests Python Windows réussis, Ruff réussi.
 - [Publication main 40794875450](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40794875450) réussie ; [v0.2.6-preview.44](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.6-preview.44) disponible avec le moteur standard et le manifeste de provenance.
 - À réaliser : comparaison utilisateur sur RTX 3080 des fenêtres 10/15/20/25/30 minutes, lots 32 et Flash désactivé. Pas de gain GPU annoncé avant mesures.
+
+
+## Reprise du jalon 3 — première intégration des interlocuteurs 0.2.7
+
+- Optimisations conservées. Mesures utilisateur : lots32, fenêtres10min/deux workers 34,8 s (autre essai39,5s), 15min81,9s avec un ajustement, 20min36,4s, 25min38,4s avec un ajustement, 30min/deux workers39,2s et remplissage85,9%, 30min/un worker37,1s. Pas de changement automatique des réglages ; référence actuelle dix minutes/deux workers, Flash désactivé.
+- Développé : lancement différé Community-1 CPU/CUDA dans un Python isolé ; préparation mono16kHz en streaming avec trous/origine conservés ; blocage des connexions pendant l'analyse, télémétries désactivées, annulation par arrêt du processus. Pas de modèle Torch résident avec Whisper.
+- Tables additives : analyses/tours/attributions/noms historisés. Dernière analyse réussie affichée, erreurs/interruptions conservées, aucun remplacement partiel. Corrections manuelles prioritaires. Groupes indépendants par piste, passages multi-voix ou insuffisamment couverts signalés ; pas de découpage arbitraire du texte.
+- Interface : configuration runtime/modèle, nombre de voix optionnel, renommage de groupe dans l'éditeur, provenance dans l'export JSON. Script et raccourci Windows de préparation du runtime utilisateur/modèle.
+- Tests locaux : 102 tests normaux réussis, Ruff réussi ; smoke Qt éditeur/lecture incluant configuration et noms de groupe réussi. Aucun test avec poids réels Community-1 déclaré réussi.
+- À exécuter : CI Windows/Linux, installation/import réel du runtime CPU, packaging/installation puis contrôles Qt/inférence. Validation Community-1 CUDA et hors ligne sur réunion représentative à réaliser après préparation autorisée du modèle. Limites initiales : 4h/piste, pas d'alignement mot à mot, noms non déduits automatiquement. Voir docs/DIARIZATION.md.

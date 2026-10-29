@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QPlainTextEdit,
@@ -72,6 +73,9 @@ class TranscriptEditor(QDialog):
         stop.clicked.connect(self.stop)
         controls.addWidget(stop)
         layout.addLayout(controls)
+        self.rename = QPushButton('Nommer tous les passages du groupe sélectionné…')
+        self.rename.clicked.connect(self.rename_group)
+        layout.addWidget(self.rename)
         self.history = QPlainTextEdit()
         self.history.setReadOnly(True)
         self.history.setMaximumHeight(120)
@@ -98,7 +102,8 @@ class TranscriptEditor(QDialog):
         self.table.setRowCount(len(self.rows))
         for index, row in enumerate(self.rows):
             for column, value in enumerate((f"{row['start']:.3f}", row['track'],
-                                             row['speaker'] or 'Inconnu', row['corrected_text'])):
+                                             row['speaker'] or ('À vérifier — plusieurs voix ou couverture faible'
+                                                               if row['speaker_ambiguous'] else 'Inconnu'), row['corrected_text'])):
                 self.table.setItem(index, column, QTableWidgetItem(value))
         self.table.blockSignals(False)
         if self.rows:
@@ -115,6 +120,7 @@ class TranscriptEditor(QDialog):
         row = self.current()
         for widget in (self.save, self.restore, self.speaker, self.text):
             widget.setEnabled(row is not None)
+        self.rename.setEnabled(row is not None and bool(row['speaker_group']))
         self.listen.setEnabled(row is not None and self.future is None)
         self.text.setPlainText(row['corrected_text'] if row else '')
         self.speaker.setText(row['speaker'] if row else '')
@@ -125,6 +131,21 @@ class TranscriptEditor(QDialog):
                 for edit in edits))
         else:
             self.history.clear()
+
+    def rename_group(self):
+        from majimeeting.speakers import name_group
+        row = self.current()
+        if row is None or not row['speaker_group']:
+            return
+        name, accepted = QInputDialog.getText(self, 'Attribution manuelle du nom',
+            f"Groupe {row['speaker_group']} : nom à appliquer aux passages sans correction manuelle")
+        if accepted:
+            try:
+                name_group(self.store, self.job, row['speaker_group'], name)
+                self.reload(self.table.currentRow())
+                self.status.setText('Nom de groupe enregistré ; corrections individuelles conservées.')
+            except (ValueError, sqlite3.Error) as exc:
+                self.status.setText(str(exc))
 
     def save_edit(self):
         row = self.current()

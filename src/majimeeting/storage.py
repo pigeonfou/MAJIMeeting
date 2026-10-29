@@ -33,6 +33,8 @@ class MeetingStore:
                 id INTEGER PRIMARY KEY AUTOINCREMENT, segment_id INTEGER NOT NULL,
                 created TEXT NOT NULL, text TEXT NOT NULL, speaker TEXT NOT NULL)''')
             db.execute('CREATE INDEX IF NOT EXISTS edits_segment ON segment_edits(segment_id,id)')
+            from majimeeting.speakers import schema
+            schema(db)
 
     @contextmanager
     def connect(self):
@@ -68,6 +70,7 @@ class MeetingStore:
             result = db.execute("UPDATE meetings SET status='interrupted' "
                                 "WHERE status='recording'")
             db.execute("UPDATE transcription_jobs SET status='interrupted' WHERE status='running'")
+            db.execute("UPDATE diarization_runs SET status='interrupted' WHERE status='running'")
             return result.rowcount
 
     def start_transcription(self, job, meeting_id, options):
@@ -138,13 +141,24 @@ class MeetingStore:
                               "ORDER BY rowid DESC", (meeting_id,)).fetchall()
 
     def segments(self, job):
+        from majimeeting.speakers import latest_run
         with self.connect() as db:
+            run = latest_run(db, job)
             return db.execute('''SELECT s.*, s.text AS original_text,
                               COALESCE(e.text,s.text) AS corrected_text,
-                              COALESCE(e.speaker,'') AS speaker
-                              FROM transcript_segments s LEFT JOIN segment_edits e ON e.id=(
+                              CASE WHEN e.id IS NOT NULL THEN e.speaker
+                                   ELSE COALESCE(NULLIF(n.name,''),a.group_id,'') END AS speaker,
+                              COALESCE(a.group_id,'') AS speaker_group,
+                              COALESCE(a.ambiguous,0) AS speaker_ambiguous,
+                              e.id IS NOT NULL AS manually_edited
+                              FROM transcript_segments s
+                              LEFT JOIN segment_edits e ON e.id=(
                                   SELECT MAX(id) FROM segment_edits WHERE segment_id=s.id)
-                              WHERE s.job_id=? ORDER BY s.start,s.track,s.id''', (job,)).fetchall()
+                              LEFT JOIN speaker_assignments a ON a.segment_id=s.id AND a.run_id=?
+                              LEFT JOIN speaker_names n ON n.id=(
+                                  SELECT MAX(id) FROM speaker_names
+                                  WHERE run_id=a.run_id AND group_id=a.group_id)
+                              WHERE s.job_id=? ORDER BY s.start,s.track,s.id''', (run, job)).fetchall()
 
     def edit_segment(self, segment_id, text, speaker):
         text, speaker = text.strip(), speaker.strip()

@@ -181,6 +181,14 @@ def editor_smoke():
         store.start_transcription('editor-smoke', meeting, TranscriptionOptions('unused'))
         store.add_segment('editor-smoke', 'track-00', 1.2, 1.7, 'Original')
         store.finish_transcription('editor-smoke', 'completed')
+        from majimeeting.diarization_ui import DiarizationDialog
+        from majimeeting.speakers import complete_run, name_group, start_run
+        configuration = DiarizationDialog()
+        configuration.close()
+        run = start_run(store, 'editor-smoke', {'engine': 'synthetic-packaging-check'})
+        complete_run(store, run, [dict(track='track-00', start=1, end=2, label='SPEAKER_00')])
+        name_group(store, 'editor-smoke', 'track-00:SPEAKER_00', 'Groupe témoin')
+        assert store.segments('editor-smoke')[0]['speaker'] == 'Groupe témoin'
         editor = TranscriptEditor(store, 'editor-smoke')
         editor.show()
         editor.text.setPlainText('Texte corrigé')

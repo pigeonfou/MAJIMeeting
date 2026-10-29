@@ -155,6 +155,22 @@ class ProcessingPanel(QWidget):
         self.edit_button = QPushButton('Corriger les textes, nommer les intervenants et réécouter…')
         self.edit_button.clicked.connect(self.open_editor)
         layout.addWidget(self.edit_button)
+        self.diarize_button = QPushButton('Distinguer automatiquement les interlocuteurs…')
+        self.diarize_button.clicked.connect(self.diarize)
+        layout.addWidget(self.diarize_button)
+
+    def diarize(self):
+        from majimeeting.diarization import diarize
+        from majimeeting.diarization_ui import DiarizationDialog
+        job = self.jobs.currentData()
+        if not job:
+            self.window.status.setText('Sélectionnez une transcription terminée.')
+            return
+        dialog = DiarizationDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            python, model, device, speakers = dialog.values()
+            self.submit('diarize', diarize, self.window.store, job, python, model,
+                        device, speakers, self.cancel, self.progress, cancellable=True)
 
     def device_changed(self, device):
         self.compute.clear()
@@ -170,7 +186,7 @@ class ProcessingPanel(QWidget):
     def set_busy(self, active):
         for widget in (self.import_button, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
-                       self.transcribe_button, self.export_button, self.edit_button,
+                       self.transcribe_button, self.export_button, self.edit_button, self.diarize_button,
                        self.batched, self.batch_size, self.quality, self.flash, self.workers, self.audio_window):
             widget.setEnabled(not active)
         if not active:
@@ -401,7 +417,9 @@ class ProcessingPanel(QWidget):
             details = json.loads(db.execute('SELECT options FROM transcription_jobs WHERE id=?',
                                            (job,)).fetchone()['options'])
         if Path(path).suffix.lower() == '.json':
+            from majimeeting.speakers import history
             text = json.dumps({'job_id': job, 'segments': rows,
+                               'diarization': history(self.window.store, job),
                                'execution': details.get('execution', {}),
                                'performance': details.get('metrics', {}),
                                'timestamp_warnings': [dict(row) for row in
