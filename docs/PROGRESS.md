@@ -486,3 +486,12 @@ stable restent à réaliser.
 - [Préversion flash-v0.2.6-exp.6](https://github.com/pigeonfou/MAJIMeeting/releases/tag/flash-v0.2.6-exp.6) publiée avec installateur séparé et SHA-256.
 - Version normale et moteur normal inchangés. Fermer l'application normale avant de lancer Flash expérimental : données et modèles partagés, verrou commun.
 - À réaliser sur la RTX 3080 : même réunion et mêmes réglages avec Flash désactivé puis activé, vérifier le réglage réellement utilisé dans l'historique, qualité du texte, durée et VRAM. La CI sans GPU ne valide pas l'exécution CUDA des kernels Flash ni un gain de performance.
+
+
+## Regroupement audio pour grands lots — fenêtres supplémentaires
+
+- Référence matérielle utilisateur : version normale, CUDA/float16, lots 32, Rapide, deux workers, Flash désactivé, fenêtres 600 s : 34,6 s pour 1504,4 secondes-pistes ; remplissage 57,3 %, lots 32/21/12. Flash expérimental fonctionnel selon historique mais aucun gain démontré dans les comparaisons précédentes.
+- Ajout demandé : fenêtres 15, 20, 25 et 30 minutes, en complément de 5 et 10. Choix mémorisé ; paramètres de génération et moteur standard inchangés.
+- Objectif : réduire les fins de lots imposées par chaque fenêtre contiguë. Pas de mélange des pistes ni des coupures récupérées. Plus de RAM possible, moins de fenêtres pour les workers ; vitesse et qualité à comparer sur RTX.
+- Tests locaux exécutés : 89 tests passés (suite normale, hors deux tests propres à la branche Flash), Ruff des fichiers modifiés réussi. Contrôles de conservation PCM, regroupement de 1250 s en une fenêtre, maintien des coupures et horodatages, modes un/deux workers et interface pour toutes les durées.
+- Tests GitHub Windows/Linux et construction installateur : à exécuter avant publication. Essai GPU réel : à réaliser après installation, voir docs/GPU_BATCHING.md.
