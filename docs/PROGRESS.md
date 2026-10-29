@@ -537,3 +537,12 @@ stable restent à réaliser.
 
 - Première CI 40859979027 : tests Windows/Linux réussis ; échec du contrôle runtime sous Windows PowerShell 5, `SyntaxError: '(' was never closed` après troncature de la commande Python `-c`. Même problème confirmé sur la capture utilisateur0.2.7. Aucun installateur0.2.8 publié à ce stade.
 - Correction : vérifications/téléchargement historique/validation déplacés dans un fichier Python auxiliaire livré avec le script ; plus de code Python passé dans les guillemets de PowerShell5. CI relancée sur le même backend utilisé par le bouton.
+
+
+### Validation et publication des boutons de préparation
+
+- [PR nº 12](https://github.com/pigeonfou/MAJIMeeting/pull/12) fusionnée dans `f31e243f9279c81b8fa584c9834da7a74c78f9bf`, source corrigée `d3b3789602aa87336f018c6ffb802b100a08d5a5`.
+- [CI corrigée 40860556767](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40860556767) réussie : 108 tests Windows et suite Linux, Ruff, installation réelle du runtime CPU par le backend du bouton sous Windows PowerShell5, import pyannote réussi. Absence CUDA normale sur ce runner CPU.
+- Construction et installation0.2.8 réussies : scripts PowerShell/Python auxiliaire présents ; contrôles démarrage/éditeur/groupes/lecture et Whisper CPU réel de l'EXE installé réussis.
+- [Publication main 40861550638](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40861550638) réussie ; [v0.2.8-preview.49](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.8-preview.49) disponible.
+- À réaliser sur le PC utilisateur : bouton dépendances CUDA, téléchargement Community-1 autorisé ou sélection des fichiers manuels existants, puis diarisation réelle et essai hors ligne. Pas de résultat GPU ou téléchargement gated réel annoncé comme validé.
