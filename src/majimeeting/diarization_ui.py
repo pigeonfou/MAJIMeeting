@@ -1,4 +1,5 @@
 """Configuration for the optional, isolated Community-1 runtime."""
+import json
 import os
 import queue
 import threading
@@ -14,21 +15,25 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
-    QSpinBox,
+    QScrollArea,
+    QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
 
+from majimeeting.diarization_controls import DiarizationControls
 from majimeeting.diarization_setup import download_community, install_dependencies
 
 
 class DiarizationDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, initial=None, tracks=()):
         super().__init__(parent)
         self.setWindowTitle('Distinguer les interlocuteurs — Community-1 local')
-        self.resize(750, 650)
+        self.resize(820, 800)
         self.future = None
         self.operation = ''
         self.close_pending = False
@@ -37,7 +42,36 @@ class DiarizationDialog(QDialog):
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='majimeeting-setup')
         self.settings = QSettings('MAJIMeeting', 'MAJIMeeting')
         root = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MAJIMeeting'
-        layout = QVBoxLayout(self)
+        initial = initial or {}
+        root_layout = QVBoxLayout(self)
+        tabs = QTabWidget()
+        root_layout.addWidget(tabs)
+        try:
+            remembered = json.loads(str(self.settings.value('diarization_tuning', '{}')))
+        except (ValueError, TypeError):
+            remembered = {}
+        self.controls = DiarizationControls(
+            initial.get('speakers', self.settings.value('diarization_speakers', 0, type=int)),
+            initial.get('tuning', remembered), tracks)
+        analysis = QWidget()
+        analysis_layout = QVBoxLayout(analysis)
+        self.device = QComboBox()
+        self.device.addItems(['cpu', 'cuda'])
+        self.device.setCurrentText(str(initial.get('device', self.settings.value('diarization_device', 'cuda'))))
+        analysis_layout.addWidget(QLabel('Calcul de diarisation :'))
+        analysis_layout.addWidget(self.device)
+        analysis_layout.addWidget(self.controls)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(analysis)
+        tabs.addTab(scroll, 'Réglages de l’analyse')
+        preparation = QWidget()
+        layout = QVBoxLayout(preparation)
+        preparation_scroll = QScrollArea()
+        preparation_scroll.setWidgetResizable(True)
+        preparation_scroll.setWidget(preparation)
+        tabs.addTab(preparation_scroll, 'Modèle et dépendances')
+        self.speakers = self.controls.speakers
         label = QLabel('Analyse après transcription, sans serveur. Les groupes ne constituent '
                        'pas une identification des personnes. Chaque piste a ses propres groupes. '
                        'Les passages ambigus restent à vérifier.\n\n'
@@ -47,25 +81,17 @@ class DiarizationDialog(QDialog):
         label.setWordWrap(True)
         layout.addWidget(label)
         layout.addWidget(QLabel('Python du runtime de diarisation :'))
-        self.python = QLineEdit(str(self.settings.value('diarization_python', root / 'runtime/Scripts/python.exe')))
+        self.python = QLineEdit(str(initial.get('python', self.settings.value('diarization_python', root / 'runtime/Scripts/python.exe'))))
         layout.addWidget(self.python)
         self.browse = QPushButton('Choisir python.exe…')
         self.browse.clicked.connect(self.choose_python)
         layout.addWidget(self.browse)
         layout.addWidget(QLabel('Dossier local Community-1 complet (config.yaml) :'))
-        self.model = QLineEdit(str(self.settings.value('diarization_model', root / 'models/community-1')))
+        self.model = QLineEdit(str(initial.get('model', self.settings.value('diarization_model', root / 'models/community-1'))))
         layout.addWidget(self.model)
         self.browse_model = QPushButton('Choisir le modèle Community-1…')
         self.browse_model.clicked.connect(self.choose_model)
         layout.addWidget(self.browse_model)
-        self.device = QComboBox()
-        self.device.addItems(['cpu', 'cuda'])
-        self.device.setCurrentText(str(self.settings.value('diarization_device', 'cuda')))
-        layout.addWidget(self.device)
-        layout.addWidget(QLabel('Nombre de voix par piste (0 = détection automatique) :'))
-        self.speakers = QSpinBox()
-        self.speakers.setRange(0, 50)
-        layout.addWidget(self.speakers)
         self.install = QPushButton('Télécharger et installer les dépendances (CPU / CUDA sélectionné)')
         self.install.clicked.connect(self.install_runtime)
         layout.addWidget(self.install)
@@ -97,7 +123,8 @@ class DiarizationDialog(QDialog):
         self.buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
-        layout.addWidget(self.buttons)
+        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Lancer la diarisation")
+        root_layout.addWidget(self.buttons)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(100)
@@ -110,7 +137,7 @@ class DiarizationDialog(QDialog):
 
     def set_preparing(self, active):
         for widget in (self.python, self.model, self.browse, self.browse_model,
-                       self.device, self.speakers, self.install, self.download):
+                       self.device, self.controls, self.install, self.download):
             widget.setEnabled(not active)
         self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(not active)
         self.cancel_setup.setEnabled(active)
@@ -197,9 +224,21 @@ class DiarizationDialog(QDialog):
         if path:
             self.model.setText(path)
 
+    def accept(self):
+        try:
+            self.controls.values()
+        except ValueError as exc:
+            QMessageBox.warning(self, 'Réglages de diarisation', str(exc))
+            return
+        super().accept()
+
     def values(self):
         for key, value in (('diarization_python', self.python.text()),
                            ('diarization_model', self.model.text()),
                            ('diarization_device', self.device.currentText())):
             self.settings.setValue(key, value)
-        return self.python.text(), self.model.text(), self.device.currentText(), self.speakers.value()
+        tuning = self.controls.values()
+        self.settings.setValue('diarization_speakers', self.speakers.value())
+        self.settings.setValue('diarization_tuning', json.dumps(tuning))
+        return (self.python.text(), self.model.text(), self.device.currentText(),
+                self.speakers.value(), tuning)

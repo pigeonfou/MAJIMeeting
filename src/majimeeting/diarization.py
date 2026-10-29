@@ -7,14 +7,16 @@ import tempfile
 import time
 import wave
 from concurrent.futures import CancelledError
+from dataclasses import asdict
 from pathlib import Path
 
+from majimeeting.diarization_options import RUNTIME_CONFIGURATION, DiarizationOptions
 from majimeeting.speakers import complete_run, start_run
 from majimeeting.transcription import check_cancel
 
 # Passed as code, with all paths in a separate JSON file (never shell interpolation).
 WORKER = r'''
-import json, os, socket, sys, wave
+import json, os, socket, sys, time, wave
 os.environ.update(HF_HUB_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1',
                   PYANNOTE_METRICS_ENABLED='false', OTEL_SDK_DISABLED='true')
 def offline(*args, **kwargs):
@@ -24,21 +26,54 @@ socket.create_connection = offline
 import numpy as np
 import torch
 from pyannote.audio import Pipeline
+''' + RUNTIME_CONFIGURATION + r'''
 request = json.load(open(sys.argv[1], encoding='utf-8'))
+print('MAJI:Chargement du modèle Community-1 local…', flush=True)
 pipeline = Pipeline.from_pretrained(request['model'])
 if request['device'] == 'cuda' and not torch.cuda.is_available():
     raise RuntimeError('CUDA PyTorch indisponible. Choisissez CPU ou installez le runtime CUDA.')
 pipeline.to(torch.device(request['device']))
+devices = dict(pipeline=str(pipeline.device),
+               segmentation=str(pipeline._segmentation.model.device),
+               embedding=str(pipeline._embedding.device))
+if request['device'] == 'cuda' and any(not v.startswith('cuda') for v in devices.values()):
+    raise RuntimeError('Un réseau de diarisation est resté sur CPU : ' + str(devices))
+gpu = torch.cuda.get_device_name() if request['device'] == 'cuda' else ''
+print('MAJI:Réseaux de diarisation : ' + str(devices) + (' — ' + gpu if gpu else ''), flush=True)
+
 with wave.open(request['audio'], 'rb') as audio:
     samples = np.frombuffer(audio.readframes(audio.getnframes()), dtype='<i2').astype(np.float32) / 32768
 waveform = torch.from_numpy(samples).unsqueeze(0)
-kwargs = {'num_speakers': request['speakers']} if request['speakers'] else {}
-output = pipeline({'waveform': waveform, 'sample_rate': 16000}, **kwargs)
+kwargs, effective = configure_pipeline(pipeline, request['tuning'])
+effective.update(devices=devices, gpu=gpu)
+phase_times = {}
+last_phase, last_time = '', time.monotonic()
+last_message = 0.
+def hook(step_name, artifact, total=None, completed=None, **unused):
+    global last_phase, last_time, last_message
+    now = time.monotonic()
+    if step_name != last_phase:
+        if last_phase:
+            phase_times[last_phase] = phase_times.get(last_phase, 0.) + now - last_time
+        last_phase, last_time = step_name, now
+        last_message = 0.
+    if now - last_message >= 2. or (total and completed == total):
+        suffix = f' {completed}/{total}' if total is not None else ''
+        print('MAJI:' + step_name + suffix + ' — réseaux ' + str(devices), flush=True)
+        last_message = now
+    if step_name == 'embeddings' and (total is None or completed == total):
+        print('MAJI:Empreintes terminées ; regroupement des voix et consolidation (CPU)…', flush=True)
+output = pipeline({'waveform': waveform, 'sample_rate': 16000}, hook=hook, **kwargs)
+if last_phase:
+    phase_times[last_phase] = phase_times.get(last_phase, 0.) + time.monotonic() - last_time
+effective['hook_intervals_seconds'] = phase_times
+if request['device'] == 'cuda':
+    effective['cuda_peak_allocated_mb'] = torch.cuda.max_memory_allocated() / 1024**2
 turns = []
 for turn, _, label in output.speaker_diarization.itertracks(yield_label=True):
     turns.append({'start': turn.start, 'end': turn.end, 'label': str(label)})
 with open(request['result'], 'w', encoding='utf-8') as target:
-    json.dump(turns, target)
+    json.dump(dict(turns=turns, effective=effective), target)
 '''
 
 
@@ -92,10 +127,11 @@ def prepare_track(track, destination, cancel=None):
     return origin, position / 16000
 
 
-def run_worker(python, model, audio, result, device, speakers, cancel, progress):
+def run_worker(python, model, audio, result, device, speakers, cancel, progress, tuning=None):
     request = result.with_suffix('.request.json')
     request.write_text(json.dumps(dict(model=str(model), audio=str(audio), result=str(result),
-                                      device=device, speakers=speakers)), encoding='utf-8')
+                                      device=device, speakers=speakers,
+                                      tuning=tuning or DiarizationOptions().for_track('', speakers))), encoding='utf-8')
     environment = os.environ.copy()
     # A frozen app's Python paths/DLL search hints must not contaminate the runtime.
     for key in ('PYTHONHOME', 'PYTHONPATH'):
@@ -103,20 +139,26 @@ def run_worker(python, model, audio, result, device, speakers, cancel, progress)
     environment.update(HF_HUB_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1',
                        PYANNOTE_METRICS_ENABLED='false', OTEL_SDK_DISABLED='true')
     log = result.with_suffix('.log')
-    with log.open('w', encoding='utf-8') as output:
+    with log.open('w', encoding='utf-8') as output, log.open('r', encoding='utf-8', errors='replace') as events:
         process = subprocess.Popen([str(python), '-I', '-c', WORKER, str(request)],
                                    stdout=output, stderr=output, env=environment,
                                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         try:
             tick = time.monotonic()
+            phase = f'Initialisation du runtime de diarisation ({device})…'
             while process.poll() is None:
                 check_cancel(cancel)
                 try:
                     process.wait(timeout=.2)
                 except subprocess.TimeoutExpired:
                     pass
+                for line in events:
+                    if line.startswith('MAJI:'):
+                        phase = line[5:].strip()
+                        progress(phase)
+                        tick = time.monotonic()
                 if time.monotonic() - tick > 5:
-                    progress('Diarisation locale en cours…')
+                    progress(phase)
                     tick = time.monotonic()
             if process.returncode:
                 raise RuntimeError('Diarisation impossible : ' + log.read_text(
@@ -162,7 +204,9 @@ def crop_turns(turns, duration):
 
 
 def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
-            progress=lambda message: None, worker=run_worker):
+            progress=lambda message: None, worker=run_worker, tuning=None):
+    tuning = (tuning or DiarizationOptions()).validate(speakers)
+    started = time.monotonic()
     python, model = Path(python), Path(model)
     if not python.is_file() or not (model / 'config.yaml').is_file():
         raise ValueError('Choisissez le Python du runtime et le dossier Community-1 local complet.')
@@ -176,7 +220,8 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
     tracks = sorted({r['track'] for r in rows})
     if not tracks:
         raise ValueError('Cette transcription ne contient aucun passage.')
-    options = dict(model=str(model), device=device, speakers=speakers,
+    options = dict(model=str(model), python=str(python), device=device, speakers=speakers,
+                   tuning=asdict(tuning), tracks=[],
                    engine='pyannote.audio/Community-1', grouping='per_track',
                    boundary_adjustments=[])
     run = start_run(store, job, options)
@@ -191,7 +236,13 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
                 audio, result = Path(temp) / 'audio.wav', Path(temp) / 'result.json'
                 origin, duration = prepare_track(store.root / record['meeting_id'] / track, audio, cancel)
                 result.unlink(missing_ok=True)
-                turns = worker(python, model.resolve(), audio, result, device, speakers, cancel, progress)
+                response = worker(python, model.resolve(), audio, result, device, speakers, cancel, progress,
+                                  tuning.for_track(track, speakers))
+                turns = response['turns'] if isinstance(response, dict) else response
+                options['tracks'].append(dict(
+                    track=track, duration=duration,
+                    groups=len({t['label'] for t in turns}),
+                    effective=response.get('effective', {}) if isinstance(response, dict) else {}))
                 normalized, audit = crop_turns(turns, duration)
                 if audit['clipped'] or audit['discarded']:
                     options['boundary_adjustments'].append(dict(track=track, **audit))
@@ -200,6 +251,7 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
                 for turn in normalized:
                     all_turns.append(dict(track=track, start=origin + turn['start'],
                                           end=origin + turn['end'], label=turn['label']))
+        options['total_seconds'] = time.monotonic() - started
         with store.connect() as db:
             db.execute('UPDATE diarization_runs SET options=? WHERE id=?',
                        (json.dumps(options), run))

@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(False)
         layout.addWidget(self.stop_button)
         self.status = QLabel("Prêt")
+        self.status.setWordWrap(True)
         self.statusBar().addWidget(self.status, 1)
         self.dark = QCheckBox("Thème sombre")
         self.dark.toggled.connect(self.set_theme)
@@ -85,6 +86,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(tabs)
         recovered = self.store.recover()
         self.reload_meetings()
+        self.processing.restore_selection()
         if recovered:
             self.status.setText(f"{recovered} réunion(s) interrompue(s) récupérée(s).")
         self.timer = QTimer(self)
@@ -104,7 +106,7 @@ class MainWindow(QMainWindow):
     def busy(self, active):
         self.processing.set_busy(active)
         for widget in (self.title, self.devices, self.refresh, self.start_button,
-                       self.export_button):
+                       self.export_button, self.meetings):
             widget.setEnabled(not active)
 
     def load_devices(self):
@@ -189,7 +191,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "MAJIMeeting", str(exc))
             if kind != 'devices':
                 self.processing.finish_progress(future.exception() is None)
-            self.processing.reload()
+            self.processing.reload(preferred_job=result if kind == 'transcribe' and future.exception() is None else None)
         if self.session and self.session.done.is_set():
             error = self.session.error
             self.session.thread.join()
