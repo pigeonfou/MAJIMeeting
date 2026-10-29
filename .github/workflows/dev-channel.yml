@@ -70,7 +70,7 @@ jobs:
           event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
           base=event.get('pull_request',{}).get('base',{}).get('sha') or event.get('before')
           files=subprocess.check_output(['git','diff','--name-only',base,'HEAD']).decode().splitlines() if base and set(base)!={'0'} else ['scripts/dev_channel.py']
-          bootstrap=any(p.startswith(('scripts/dev_', 'scripts/install-dev', 'scripts/Installer-DEV', '.github/workflows/dev-channel', '.github/scripts/build_dev')) or p=='requirements-dev-runtime.txt' for p in files)
+          bootstrap=any(p.startswith(('scripts/dev_', 'scripts/run_source', 'scripts/install-dev', 'scripts/Installer-DEV', '.github/workflows/dev-channel', '.github/scripts/build_dev')) or p in {'requirements-dev-runtime.txt','pyproject.toml'} for p in files)
           with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write(f'bootstrap={str(bootstrap).lower()}\n')
       - name: Real bootstrap under Windows PowerShell 5
         if: runner.os == 'Windows' && steps.changes.outputs.bootstrap == 'true'
