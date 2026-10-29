@@ -495,3 +495,11 @@ stable restent à réaliser.
 - Objectif : réduire les fins de lots imposées par chaque fenêtre contiguë. Pas de mélange des pistes ni des coupures récupérées. Plus de RAM possible, moins de fenêtres pour les workers ; vitesse et qualité à comparer sur RTX.
 - Tests locaux exécutés : 89 tests passés (suite normale, hors deux tests propres à la branche Flash), Ruff des fichiers modifiés réussi. Contrôles de conservation PCM, regroupement de 1250 s en une fenêtre, maintien des coupures et horodatages, modes un/deux workers et interface pour toutes les durées.
 - Tests GitHub Windows/Linux et construction installateur : à exécuter avant publication. Essai GPU réel : à réaliser après installation, voir docs/GPU_BATCHING.md.
+
+
+### Validation et publication des fenêtres 15/20/25/30 minutes
+
+- [PR nº 10](https://github.com/pigeonfou/MAJIMeeting/pull/10) fusionnée dans `6234b2546d64d3d7932aa7526f5b16782097a9fa` ; source `c2c1d4a4614a738cda38eac92872d4f6476739fd`.
+- [CI PR 40794119935](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40794119935) réussie : tests Windows/Linux, contrôles Qt et inférence, construction et installation Windows. 89 tests Python Windows réussis, Ruff réussi.
+- [Publication main 40794875450](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40794875450) réussie ; [v0.2.6-preview.44](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.6-preview.44) disponible avec le moteur standard et le manifeste de provenance.
+- À réaliser : comparaison utilisateur sur RTX 3080 des fenêtres 10/15/20/25/30 minutes, lots 32 et Flash désactivé. Pas de gain GPU annoncé avant mesures.
