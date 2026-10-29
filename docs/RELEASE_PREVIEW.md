@@ -1,19 +1,7 @@
-# MAJIMeeting 0.2.6 — essais GPU avancés
+# MAJIMeeting 0.2.9 — correction des bornes de diarisation
 
-- Option Flash Attention, reprise CUDA sans cette option si non prise en charge.
-- Option deux workers natifs : fenêtres concurrentes partageant un seul modèle.
-- Fenêtres de 5 ou 10 minutes et lots jusqu'à 32 sur choix explicite.
-- Tailles réelles des lots, distribution et remplissage dans l'historique et le JSON.
-- Temporaires isolés, annulation coopérative ; reprise à un worker prioritaire si VRAM insuffisante.
+Les tours de parole Community-1 sont limités au support audio réel. Les sorties par trames dépassant le début ou la fin ne font plus échouer toute l'analyse. Les passages entièrement extérieurs sont ignorés ; les intervalles non finis ou inversés restent rejetés. Les ajustements sont conservés dans l'historique de l'analyse.
 
-Installer par-dessus 0.2.5. Aucun nouveau modèle requis. Flash Attention et deux workers
-restent désactivés par défaut ; données et réglages ordinaires conservés.
+Installer par-dessus la version existante, puis relancer « Distinguer automatiquement les interlocuteurs » sur la transcription existante. Aucun nouveau téléchargement du modèle ni réinstallation des dépendances nécessaire.
 
-Comparer sur la même réunion : CUDA / float16 / lots 16 / Rapide, référence 1 worker /
-5 min / Flash non, puis Flash seul, deux workers seuls, fenêtres de dix minutes seules.
-Lire les paramètres effectifs et vérifier les mêmes passages audio. Le taux de remplissage
-n'est pas une occupation GPU. Voir docs/GPU_EXPERIMENTS.md.
-
-Les tests CPU et simulations ne valident pas Flash CUDA ni un gain sur RTX. La compatibilité
-Flash de cette distribution et le gain réel sont à tester. Deux workers peuvent ralentir
-le traitement. La diarisation automatique reste à intégrer.
+Validation : 115 tests Windows et Linux, runtime CPU pyannote et contrôles de l'application installée réussis. Diarisation réelle et qualité sur le GPU utilisateur encore à vérifier.

@@ -557,3 +557,11 @@ stable restent à réaliser.
 - Validation réelle sur le PC utilisateur et qualité de diarisation restent à réaliser après installation de la correction.
 
 - Tests locaux : 115 tests réussis (dont 20 tests interlocuteurs), Ruff réussi sur les fichiers Python modifiés. CI Windows/Linux et installateur à contrôler.
+
+### Publication de la correction 0.2.9
+
+- [PR nº 13](https://github.com/pigeonfou/MAJIMeeting/pull/13), source `e4ccd89f3a0922aa6b36ef60b2a6b3e6eb4629a2`, fusion `fefe3b9be70e571ef495c0991f25fb2855b9b5cc`.
+- [CI 40883749131](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40883749131) réussie : 115 tests par système, Ruff, Qt, transcription CPU réelle hors ligne, installation/import runtime pyannote CPU, construction et contrôles de l'application installée.
+- [Publication 40884943912](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40884943912) réussie ; [v0.2.9-preview.51](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.9-preview.51) disponible. SHA-256 installateur : `84211b84725c9d974bf880cd102c340edbcff397a0ebbb348c1d10a46c657b16`.
+- Le texte automatique de la release reprend encore l'ancienne note 0.2.6 ; le fichier RELEASE_PREVIEW est actualisé ci-dessous pour les prochaines publications. Le binaire 0.2.9 est bien celui testé par la PR13.
+- À réaliser : relancer la diarisation réelle sur la réunion utilisateur avec la correction, vérifier les groupes, les chevauchements et l'absence de réseau.
