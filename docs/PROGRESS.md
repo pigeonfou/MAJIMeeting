@@ -618,3 +618,5 @@ stable restent à réaliser.
 - CI installateur limitée aux changements de packaging/version/infra de publication et lancement manuel. Cette transition déclenche encore une validation complète, les changements ordinaires de code ne reconstruiront plus l'EXE.
 - Tests locaux :155tests réussis et Ruff réussi. Le lancement isolé `-I` du runtime scratch ne trouve pas les dépendances installées en user-site : environnement local non représentatif d'un venv Windows ; contrôle du vrai bootstrap et de son venv à effectuer en CI. Aucun succès d'installation sur PC utilisateur annoncé.
 - À réaliser : CI, correction des erreurs éventuelles, publication du bootstrap, installation et validation CUDA/capture sur PC utilisateur. Durée des futures livraisons à mesurer ; aucun gain de vitesse des modèles IA attendu.
+
+- Première CI PR : Linux réussi, Windows154tests réussis/1échec dans le test de verrou concurrent (lecture d'un octet protégé par msvcrt). Runs source40951486766 et installateur40951486722 en échec, rien publié. Correction : initialisation fondée sur les métadonnées du fichier, sans lecture de la région verrouillée ; exception normalisée. CI relancée.

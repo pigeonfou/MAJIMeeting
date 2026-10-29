@@ -42,12 +42,13 @@ def read_state(root):
 def guard(root):
     root.mkdir(parents=True, exist_ok=True)
     with (root / 'manager.guard').open('a+b') as handle:
-        handle.seek(0)
-        if not handle.read(1):
-            handle.write(b'0')
-            handle.flush()
-        handle.seek(0)
         try:
+            # Windows forbids reads inside a region held by another lock.
+            # Metadata can be inspected without touching the locked byte.
+            if os.fstat(handle.fileno()).st_size == 0:
+                handle.write(b'0')
+                handle.flush()
+            handle.seek(0)
             if os.name == 'nt':
                 import msvcrt
                 msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
