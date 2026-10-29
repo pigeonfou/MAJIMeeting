@@ -513,3 +513,12 @@ stable restent à réaliser.
 - Interface : configuration runtime/modèle, nombre de voix optionnel, renommage de groupe dans l'éditeur, provenance dans l'export JSON. Script et raccourci Windows de préparation du runtime utilisateur/modèle.
 - Tests locaux : 102 tests normaux réussis, Ruff réussi ; smoke Qt éditeur/lecture incluant configuration et noms de groupe réussi. Aucun test avec poids réels Community-1 déclaré réussi.
 - À exécuter : CI Windows/Linux, installation/import réel du runtime CPU, packaging/installation puis contrôles Qt/inférence. Validation Community-1 CUDA et hors ligne sur réunion représentative à réaliser après préparation autorisée du modèle. Limites initiales : 4h/piste, pas d'alignement mot à mot, noms non déduits automatiquement. Voir docs/DIARIZATION.md.
+
+
+### Validation et publication de la première intégration J3
+
+- [PR nº 11](https://github.com/pigeonfou/MAJIMeeting/pull/11) fusionnée dans `b25e8b8a886962478c3596bda0b0c1aea8d19ff9` ; source `3cae71879d7c4395a5148683fc90a4658ce624aa`.
+- [CI PR 40842847791](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40842847791) réussie : 102 tests Windows et suite Linux, Ruff, contrôle Qt éditeur/groupes/lecture, inférence Whisper CPU réelle, construction et installation Windows avec contrôles de l'EXE installé.
+- Job diarization-runtime Windows réussi : installation réelle torch2.8.0+cpu/torchaudio2.8.0+cpu/torchcodec0.7.0/pyannote.audio4.0.7 et import Pipeline réussi. Aucun poids Community-1 utilisé ; CUDA absent sur le runner, ce qui est attendu.
+- [Run main 40843827434](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40843827434) réussi, [v0.2.7-preview.46](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.7-preview.46) publiée.
+- Prochaine validation utilisateur : installer0.2.7, préparer runtime/modèle via le raccourci fourni après acceptation HF, puis diarisation réelle CUDA/hors ligne d'une réunion à plusieurs voix ; consulter docs/DIARIZATION.md. Le jalon3 n'est pas déclaré terminé avant cet essai.
