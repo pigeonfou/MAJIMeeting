@@ -7,7 +7,7 @@ from concurrent.futures import CancelledError
 import pytest
 from test_editor import prepared
 
-from majimeeting.diarization import diarize, prepare_track, run_worker
+from majimeeting.diarization import crop_turns, diarize, prepare_track, run_worker
 from majimeeting.speakers import complete_run, history, match_turns, name_group, start_run
 
 
@@ -143,3 +143,35 @@ def test_editor_group_rename_and_json_export(tmp_path, monkeypatch):
     assert result['diarization'][0]['names'][0]['name'] == 'Alice'
     window.close()
     app.processEvents()
+
+
+def test_model_frame_boundaries_are_cropped_without_shifting_speech():
+    turns, audit = crop_turns([turn(-.02, .5), turn(.4, 2.03, 'B'),
+                              turn(2.01, 2.04), turn(-.03, -.01)], 2.)
+    assert turns == [dict(start=0., end=.5, label='SPEAKER_00'),
+                     dict(start=.4, end=2., label='B')]
+    assert audit['clipped'] == 2
+    assert audit['discarded'] == 2
+    assert audit['max_after_seconds'] == pytest.approx(.04)
+
+
+@pytest.mark.parametrize('start,end', [(0, float('nan')), (-float('inf'), 1),
+                                      (0, float('inf')), (1, 1), (2, 1)])
+def test_invalid_model_intervals_still_fail(start, end):
+    with pytest.raises(ValueError, match='Tour de parole invalide'):
+        crop_turns([turn(start, end)], 2.)
+
+
+def test_diarization_crops_final_frame_and_persists_audit(tmp_path):
+    store, _ = prepared(tmp_path)
+    python, model = runtime(tmp_path)
+    diarize(store, 'job', python, model,
+            worker=lambda *args: [turn(-.02, 2.03)])
+    run = history(store, 'job')[0]
+    assert run['status'] == 'completed'
+    assert run['turns'][0]['start'] == 1.5
+    assert run['turns'][0]['end'] == 3.5
+    assert store.segments('job')[0]['speaker'] == 'track-00:SPEAKER_00'
+    with store.connect() as db:
+        options = json.loads(db.execute('SELECT options FROM diarization_runs').fetchone()[0])
+    assert options['boundary_adjustments'][0]['clipped'] == 1

@@ -1,5 +1,6 @@
 """Offline Community-1 adapter in an isolated Python runtime; no Torch in the GUI."""
 import json
+import math
 import os
 import subprocess
 import tempfile
@@ -133,6 +134,33 @@ def run_worker(python, model, audio, result, device, speakers, cancel, progress)
     return json.loads(result.read_text(encoding='utf-8'))
 
 
+def crop_turns(turns, duration):
+    """Intersect frame-based model output with the actual PCM support.
+
+    Pyannote annotations describe model frames, whose edges can extend past the
+    waveform. Never shift all timestamps or create speech outside the recording.
+    Keep a bounded audit summary; malformed/non-finite intervals remain errors.
+    """
+    if not math.isfinite(duration) or duration <= 0:
+        raise ValueError('Durée audio invalide.')
+    result = []
+    audit = dict(clipped=0, discarded=0, max_before_seconds=0., max_after_seconds=0.)
+    for turn in turns:
+        start, end = float(turn['start']), float(turn['end'])
+        if not (math.isfinite(start) and math.isfinite(end) and start < end):
+            raise ValueError(f'Tour de parole invalide : début={start}, fin={end}.')
+        audit['max_before_seconds'] = max(audit['max_before_seconds'], -start)
+        audit['max_after_seconds'] = max(audit['max_after_seconds'], end - duration)
+        first, last = max(0., start), min(duration, end)
+        if first >= last:
+            audit['discarded'] += 1
+            continue
+        if first != start or last != end:
+            audit['clipped'] += 1
+        result.append(dict(start=first, end=last, label=turn['label']))
+    return result, audit
+
+
 def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
             progress=lambda message: None, worker=run_worker):
     python, model = Path(python), Path(model)
@@ -148,8 +176,10 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
     tracks = sorted({r['track'] for r in rows})
     if not tracks:
         raise ValueError('Cette transcription ne contient aucun passage.')
-    run = start_run(store, job, dict(model=str(model), device=device, speakers=speakers,
-                                    engine='pyannote.audio/Community-1', grouping='per_track'))
+    options = dict(model=str(model), device=device, speakers=speakers,
+                   engine='pyannote.audio/Community-1', grouping='per_track',
+                   boundary_adjustments=[])
+    run = start_run(store, job, options)
     try:
         all_turns = []
         with tempfile.TemporaryDirectory(prefix='majimeeting-speakers-') as temp:
@@ -162,12 +192,17 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
                 origin, duration = prepare_track(store.root / record['meeting_id'] / track, audio, cancel)
                 result.unlink(missing_ok=True)
                 turns = worker(python, model.resolve(), audio, result, device, speakers, cancel, progress)
-                for turn in turns:
-                    start, end = float(turn['start']), float(turn['end'])
-                    if not (0 <= start < end <= duration + .01):
-                        raise ValueError('Tour de parole hors de la piste audio.')
-                    all_turns.append(dict(track=track, start=origin + start,
-                                          end=origin + min(end, duration), label=turn['label']))
+                normalized, audit = crop_turns(turns, duration)
+                if audit['clipped'] or audit['discarded']:
+                    options['boundary_adjustments'].append(dict(track=track, **audit))
+                    progress(f"{track} : bornes audio ajustées : {audit['clipped']} tour(s), "
+                             f"{audit['discarded']} hors audio ignoré(s).")
+                for turn in normalized:
+                    all_turns.append(dict(track=track, start=origin + turn['start'],
+                                          end=origin + turn['end'], label=turn['label']))
+        with store.connect() as db:
+            db.execute('UPDATE diarization_runs SET options=? WHERE id=?',
+                       (json.dumps(options), run))
         check_cancel(cancel)
         return complete_run(store, run, all_turns)
     except Exception as exc:

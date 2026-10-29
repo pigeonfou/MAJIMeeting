@@ -546,3 +546,14 @@ stable restent à réaliser.
 - Construction et installation0.2.8 réussies : scripts PowerShell/Python auxiliaire présents ; contrôles démarrage/éditeur/groupes/lecture et Whisper CPU réel de l'EXE installé réussis.
 - [Publication main 40861550638](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40861550638) réussie ; [v0.2.8-preview.49](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.8-preview.49) disponible.
 - À réaliser sur le PC utilisateur : bouton dépendances CUDA, téléchargement Community-1 autorisé ou sélection des fichiers manuels existants, puis diarisation réelle et essai hors ligne. Pas de résultat GPU ou téléchargement gated réel annoncé comme validé.
+
+
+### 29 octobre 2026 — correction des bornes de diarisation (0.2.9)
+
+- Retour utilisateur : runtime CUDA disponible et Community-1 chargé hors ligne ; première diarisation interrompue par « Tour de parole hors de la piste audio ». Transcription rapide CUDA terminée en 32,6 s pour 1504,4 s de pistes.
+- Cause identifiée dans l'adaptateur : contrôle strict de 10 ms sur les sorties par trames du modèle. L'écart exact du cas utilisateur n'était pas inclus dans l'ancien message.
+- Correction : intersection des tours de parole avec le support PCM réel, sans déplacement de la chronologie ni modification du texte. Tours sans intersection ignorés, intervalles non finis/inversés toujours rejetés. Compteurs et dépassements maximaux enregistrés dans les options de l'analyse et exportés dans son historique.
+- Tests ajoutés : dépassements aux deux bornes, tours entièrement extérieurs, chevauchement conservé, valeurs invalides, intégration SQLite avec origine de piste et audit.
+- Validation réelle sur le PC utilisateur et qualité de diarisation restent à réaliser après installation de la correction.
+
+- Tests locaux : 115 tests réussis (dont 20 tests interlocuteurs), Ruff réussi sur les fichiers Python modifiés. CI Windows/Linux et installateur à contrôler.
