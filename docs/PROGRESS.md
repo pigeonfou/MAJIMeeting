@@ -476,3 +476,13 @@ stable restent à réaliser.
 - Deuxième run [40771641842](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40771641842) : compilation native en cours au moment de cette note. Aucun moteur Flash ni installateur expérimental déclaré fonctionnel.
 - CTranslate2 4.8.4 fixé au commit `5de572ef60b67a0276c5989ee73d0072808ff4c3`, CUDA 12.8.1, architecture 8.6, WITH_FLASH_ATTN=ON, CPU RUY. Sonde native ajoutée pour lire le flag réel de la DLL, sans modifier les kernels d'attention.
 - 78 tests locaux avec le moteur standard réussis, Ruff et préparation des sources réussis. Les tests du moteur personnalisé, de son empaquetage et les essais sur RTX restent à réaliser.
+
+
+## Flash expérimental Windows : installateur publié le 29 octobre 2026
+
+- Compilation native réussie dans le run 40779226342 ; premier empaquetage bloqué par un import implicite de `majimeeting.__main__` non détecté par PyInstaller.
+- Diagnostic conservé dans le lanceur (44e0e690), import explicite corrigé dans `24ebe0b1d3e7584b519bf065aece192e9369d953` sur `experiment/windows-flash`.
+- [Run 40790610479](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40790610479) intégralement réussi : moteur natif Flash vérifié, 78 tests Windows passés, Ruff réussi, inférence CPU réelle, construction/installation, sonde native dans l'EXE installé, démarrage Qt, éditeur/audio et inférence CPU de l'application installée réussis.
+- [Préversion flash-v0.2.6-exp.6](https://github.com/pigeonfou/MAJIMeeting/releases/tag/flash-v0.2.6-exp.6) publiée avec installateur séparé et SHA-256.
+- Version normale et moteur normal inchangés. Fermer l'application normale avant de lancer Flash expérimental : données et modèles partagés, verrou commun.
+- À réaliser sur la RTX 3080 : même réunion et mêmes réglages avec Flash désactivé puis activé, vérifier le réglage réellement utilisé dans l'historique, qualité du texte, durée et VRAM. La CI sans GPU ne valide pas l'exécution CUDA des kernels Flash ni un gain de performance.
