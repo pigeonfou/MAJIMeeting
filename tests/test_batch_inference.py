@@ -32,12 +32,17 @@ def test_batched_engine_receives_settings_and_keeps_absolute_times(tmp_path):
 
         def transcribe(self, path, **kwargs):
             calls.append(kwargs)
-            return iter([SimpleNamespace(start=.5, end=1.5, text='Passage groupé')]), None
+            return iter([SimpleNamespace(start=.5, end=1.5, text='Passage groupé', words=[
+                dict(start=.5, end=1., word='Passage', probability=.9),
+                dict(start=1., end=1.5, word=' groupé', probability=.9)])]), None
 
     job = transcribe_meeting(store, meeting, options, model_factory=Model,
                              pipeline_factory=Pipeline, cuda_prepare=lambda _: None)
+    with store.connect() as db:
+        words = db.execute('SELECT start,word FROM transcript_words ORDER BY position').fetchall()
+    assert [(w['start'], w['word']) for w in words] == [(14., 'Passage'), (14.5, ' groupé')]
     assert calls == [{'language': 'fr', 'beam_size': 1, 'vad_filter': True,
-                      'without_timestamps': False, 'batch_size': 8}]
+                      'without_timestamps': False, 'word_timestamps': True, 'batch_size': 8}]
     segment = store.segments(job)[0]
     assert (segment['start'], segment['end']) == (14, 15)
     details = json.loads(store.transcription_jobs(meeting)[0]['options'])

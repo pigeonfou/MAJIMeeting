@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -21,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from majimeeting.playback import make_excerpt
+from majimeeting.speaker_overview import speaker_display
 
 
 class TranscriptEditor(QDialog):
@@ -43,6 +45,9 @@ class TranscriptEditor(QDialog):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel('Sélectionnez un passage pour le corriger ; double-cliquez pour '
                                 'l’écouter (60 s maximum). Les pistes ne sont pas des personnes.'))
+        self.only_uncertain = QCheckBox('Afficher uniquement les passages à vérifier')
+        self.only_uncertain.toggled.connect(lambda *_: self.reload())
+        layout.addWidget(self.only_uncertain)
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(['Début (s)', 'Piste', 'Intervenant', 'Texte'])
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -98,12 +103,13 @@ class TranscriptEditor(QDialog):
 
     def reload(self, selected=0):
         self.rows = self.store.segments(self.job)
+        if self.only_uncertain.isChecked():
+            self.rows = [r for r in self.rows if r['speaker_ambiguous'] and not r['manually_edited']]
         self.table.blockSignals(True)
         self.table.setRowCount(len(self.rows))
         for index, row in enumerate(self.rows):
             for column, value in enumerate((f"{row['start']:.3f}", row['track'],
-                                             row['speaker'] or ('À vérifier — plusieurs voix ou couverture faible'
-                                                               if row['speaker_ambiguous'] else 'Inconnu'), row['corrected_text'])):
+                                             speaker_display(row), row['corrected_text'])):
                 self.table.setItem(index, column, QTableWidgetItem(value))
         self.table.blockSignals(False)
         if self.rows:
@@ -125,7 +131,11 @@ class TranscriptEditor(QDialog):
         self.text.setPlainText(row['corrected_text'] if row else '')
         self.speaker.setText(row['speaker'] if row else '')
         if row:
-            edits = self.store.segment_history(row['id'])
+            if row.get('piece_id') is not None:
+                from majimeeting.speaker_pieces import piece_history
+                edits = piece_history(self.store, row['piece_id'])
+            else:
+                edits = self.store.segment_history(row['id'])
             self.history.setPlainText('Original : ' + row['original_text'] + '\n' + '\n'.join(
                 f"{edit['created']} — {edit['speaker'] or 'Inconnu'} : {edit['text']}"
                 for edit in edits))
@@ -152,7 +162,11 @@ class TranscriptEditor(QDialog):
         if row is None:
             return
         try:
-            self.store.edit_segment(row['id'], self.text.toPlainText(), self.speaker.text())
+            if row.get('piece_id') is not None:
+                from majimeeting.speaker_pieces import edit_piece
+                edit_piece(self.store, row['piece_id'], self.text.toPlainText(), self.speaker.text())
+            else:
+                self.store.edit_segment(row['id'], self.text.toPlainText(), self.speaker.text())
             self.reload(self.table.currentRow())
             self.status.setText('Correction enregistrée ; original et historique conservés.')
         except (ValueError, OSError, sqlite3.Error) as exc:

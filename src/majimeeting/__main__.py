@@ -173,6 +173,8 @@ class MainWindow(QMainWindow):
                     self.status.setText(
                         f'Transcription terminée avec {warnings} avertissement(s) d’horodatage à vérifier.'
                         if warnings else 'Transcription terminée ; consultez le mode de calcul dans l’historique.')
+                elif kind == 'meeting-analysis':
+                    self.status.setText('Transcription et découpage terminés : nommez les intervenants proposés.')
                 elif kind == 'diarize':
                     self.status.setText('Interlocuteurs analysés. Ouvrez l’éditeur pour nommer les groupes '
                                         'et vérifier les passages ambigus.')
@@ -191,7 +193,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "MAJIMeeting", str(exc))
             if kind != 'devices':
                 self.processing.finish_progress(future.exception() is None)
-            self.processing.reload(preferred_job=result if kind == 'transcribe' and future.exception() is None else None)
+            self.processing.reload(preferred_job=result if kind in {'transcribe', 'meeting-analysis'} and future.exception() is None else None)
+            if kind == 'meeting-analysis' and future.exception() is None:
+                QTimer.singleShot(0, self.processing.open_speakers)
         if self.session and self.session.done.is_set():
             error = self.session.error
             self.session.thread.join()

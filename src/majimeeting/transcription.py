@@ -271,7 +271,7 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
                              f"({'lots de ' + str(options.batch_size) if options.batched else 'séquentiel'}, "
                              f'beam={options.beam_size})')
                     kwargs = {'language': options.language, 'beam_size': options.beam_size,
-                              'vad_filter': True, 'without_timestamps': False}
+                              'vad_filter': True, 'without_timestamps': False, 'word_timestamps': True}
                     if options.batched:
                         kwargs['batch_size'] = options.batch_size
                     before = time.perf_counter()
@@ -302,7 +302,8 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
                                                                 warning, text)
                             if bounds is not None:
                                 start, end = bounds
-                                store.add_segment(job, track.name, offset + start, offset + end, text)
+                                store.add_segment(job, track.name, offset + start, offset + end, text,
+                                                  getattr(segment, 'words', None), offset)
                         finally:
                             metrics['save_seconds'] += time.perf_counter() - before
                         if bounds is not None:
@@ -389,7 +390,7 @@ def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline
             before = time.perf_counter()
             try:
                 segments, _ = runner.transcribe(str(path), language=options.language,
-                    beam_size=options.beam_size, vad_filter=True, without_timestamps=False,
+                    beam_size=options.beam_size, vad_filter=True, without_timestamps=False, word_timestamps=True,
                     batch_size=options.batch_size)
                 segments = iter(segments)
             finally:
@@ -415,7 +416,8 @@ def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline
                             segment.start, segment.end, warning, text)
                     if bounds is not None:
                         start, end = bounds
-                        store.add_segment(job, track_name, offset + start, offset + end, text)
+                        store.add_segment(job, track_name, offset + start, offset + end, text,
+                                          getattr(segment, 'words', None), offset)
                 finally:
                     local['save_seconds'] += time.perf_counter() - before
             local['completed_audio_seconds'] = duration
