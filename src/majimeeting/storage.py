@@ -35,6 +35,8 @@ class MeetingStore:
             db.execute('CREATE INDEX IF NOT EXISTS edits_segment ON segment_edits(segment_id,id)')
             from majimeeting.speakers import schema
             schema(db)
+            from majimeeting.word_alignment import schema as word_schema
+            word_schema(db)
 
     @contextmanager
     def connect(self):
@@ -81,10 +83,15 @@ class MeetingStore:
             db.execute("INSERT INTO transcription_jobs VALUES (?, ?, ?, 'running', ?, '')",
                        (job, meeting_id, datetime.now(UTC).isoformat(), json.dumps(asdict(options))))
 
-    def add_segment(self, job, track, start, end, text):
+    def add_segment(self, job, track, start, end, text, words=None, word_offset=0.):
         with self.connect() as db:
-            db.execute("INSERT INTO transcript_segments(job_id,track,start,end,text) "
-                       "VALUES (?, ?, ?, ?, ?)", (job, track, start, end, text))
+            cursor = db.execute("INSERT INTO transcript_segments(job_id,track,start,end,text) "
+                                "VALUES (?, ?, ?, ?, ?)", (job, track, start, end, text))
+            if words:
+                from majimeeting.word_alignment import save_words
+                save_words(db, dict(id=cursor.lastrowid, start=start, end=end, text=text), words,
+                           word_offset)
+            return cursor.lastrowid
 
     def finish_transcription(self, job, state, error=''):
         with self.connect() as db:
@@ -103,8 +110,10 @@ class MeetingStore:
                                     'fallback_reason': fallback_reason, 'batched': batched,
                                     'batch_size': batch_size, 'beam_size': beam_size,
                                     'flash_attention': flash_attention, 'gpu_workers': gpu_workers,
-                                    'window_seconds': window_seconds}
+                                    'window_seconds': window_seconds, 'word_timestamps': True}
             if reset_segments:
+                db.execute('DELETE FROM transcript_words WHERE segment_id IN '
+                           '(SELECT id FROM transcript_segments WHERE job_id=?)', (job,))
                 db.execute('DELETE FROM transcript_segments WHERE job_id=?', (job,))
                 db.execute('DELETE FROM transcription_warnings WHERE job_id=?', (job,))
             db.execute('UPDATE transcription_jobs SET options=? WHERE id=?',
@@ -144,7 +153,7 @@ class MeetingStore:
         from majimeeting.speakers import latest_run
         with self.connect() as db:
             run = latest_run(db, job)
-            return db.execute('''SELECT s.*, s.text AS original_text,
+            rows = db.execute('''SELECT s.*, s.text AS original_text,
                               COALESCE(e.text,s.text) AS corrected_text,
                               CASE WHEN e.id IS NOT NULL THEN e.speaker
                                    ELSE COALESCE(NULLIF(n.name,''),a.group_id,'') END AS speaker,
@@ -159,6 +168,8 @@ class MeetingStore:
                                   SELECT MAX(id) FROM speaker_names
                                   WHERE run_id=a.run_id AND group_id=a.group_id)
                               WHERE s.job_id=? ORDER BY s.start,s.track,s.id''', (run, job)).fetchall()
+            from majimeeting.speaker_pieces import project_segments
+            return project_segments(db, rows, run)
 
     def edit_segment(self, segment_id, text, speaker):
         text, speaker = text.strip(), speaker.strip()

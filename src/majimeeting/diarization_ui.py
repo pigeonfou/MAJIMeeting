@@ -30,10 +30,11 @@ from majimeeting.diarization_setup import download_community, install_dependenci
 
 
 class DiarizationDialog(QDialog):
-    def __init__(self, parent=None, initial=None, tracks=()):
+    def __init__(self, parent=None, initial=None, tracks=(), transcribe_first=False):
         super().__init__(parent)
         self.setWindowTitle('Distinguer les interlocuteurs — Community-1 local')
         self.resize(820, 800)
+        self.transcribe_first = transcribe_first
         self.future = None
         self.operation = ''
         self.close_pending = False
@@ -53,6 +54,12 @@ class DiarizationDialog(QDialog):
         self.controls = DiarizationControls(
             initial.get('speakers', self.settings.value('diarization_speakers', 0, type=int)),
             initial.get('tuning', remembered), tracks)
+        if transcribe_first:
+            self.setWindowTitle('Transcrire puis proposer les intervenants')
+            self.controls.layout().itemAt(0).widget().setText(
+                'Lance la transcription mot à mot, puis le découpage par voix. '
+                'Vous pourrez ensuite nommer les groupes avec de courts extraits. '
+                'Les superpositions et attributions incertaines restent signalées.')
         analysis = QWidget()
         analysis_layout = QVBoxLayout(analysis)
         self.device = QComboBox()
@@ -227,6 +234,10 @@ class DiarizationDialog(QDialog):
     def accept(self):
         try:
             self.controls.values()
+            if self.transcribe_first and (not Path(self.python.text()).is_file() or
+                    not (Path(self.model.text()) / 'config.yaml').is_file()):
+                raise ValueError('Préparez le runtime Python et Community-1 dans '
+                                 'l’onglet Modèle et dépendances avant de lancer le traitement complet.')
         except ValueError as exc:
             QMessageBox.warning(self, 'Réglages de diarisation', str(exc))
             return

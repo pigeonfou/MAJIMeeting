@@ -204,7 +204,7 @@ def crop_turns(turns, duration):
 
 
 def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
-            progress=lambda message: None, worker=run_worker, tuning=None):
+            progress=lambda message: None, worker=run_worker, tuning=None, whisper_model_path=None):
     tuning = (tuning or DiarizationOptions()).validate(speakers)
     started = time.monotonic()
     python, model = Path(python), Path(model)
@@ -223,18 +223,21 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
     options = dict(model=str(model), python=str(python), device=device, speakers=speakers,
                    tuning=asdict(tuning), tracks=[],
                    engine='pyannote.audio/Community-1', grouping='per_track',
+                   segmentation_method='word_timestamps',
                    boundary_adjustments=[])
     run = start_run(store, job, options)
     try:
         all_turns = []
+        prepared_audio = {}
         with tempfile.TemporaryDirectory(prefix='majimeeting-speakers-') as temp:
             for track in tracks:
                 check_cancel(cancel)
                 if Path(track).name != track or not track.startswith('track-'):
                     raise ValueError('Piste invalide.')
                 progress(f'{track} : préparation pour la diarisation…')
-                audio, result = Path(temp) / 'audio.wav', Path(temp) / 'result.json'
+                audio, result = Path(temp) / (track + '.wav'), Path(temp) / 'result.json'
                 origin, duration = prepare_track(store.root / record['meeting_id'] / track, audio, cancel)
+                prepared_audio[track] = (audio, origin)
                 result.unlink(missing_ok=True)
                 response = worker(python, model.resolve(), audio, result, device, speakers, cancel, progress,
                                   tuning.for_track(track, speakers))
@@ -251,6 +254,9 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
                 for turn in normalized:
                     all_turns.append(dict(track=track, start=origin + turn['start'],
                                           end=origin + turn['end'], label=turn['label']))
+            from majimeeting.word_alignment import align_existing
+            options['word_alignment'] = align_existing(
+                store, job, all_turns, whisper_model_path, cancel, progress, prepared_audio=prepared_audio)
         options['total_seconds'] = time.monotonic() - started
         with store.connect() as db:
             db.execute('UPDATE diarization_runs SET options=? WHERE id=?',

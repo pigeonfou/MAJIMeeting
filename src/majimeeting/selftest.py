@@ -54,6 +54,7 @@ def inference_smoke(model_path):
     del pipeline, original_encode, counted_encode, batch_segments, segments
     del model
     native_parallel_smoke(model_path)
+    alignment_smoke(model_path)
     with tempfile.TemporaryDirectory(prefix='majimeeting-selftest-') as temp:
         folder = Path(temp)
         audio = folder / 'silence.wav'
@@ -99,6 +100,22 @@ def inference_smoke(model_path):
         assert 'cublas64_12.dll' in execution['fallback_reason']
         timestamp_boundary_smoke(store, TranscriptionOptions(model_path))
     return 0
+
+
+def alignment_smoke(model_path):
+    """Exercise real CPU attention alignment, without asserting speech on silence."""
+    import numpy as np
+    from faster_whisper import WhisperModel
+    from faster_whisper.tokenizer import Tokenizer
+
+    from majimeeting.word_alignment import align_text
+    model = WhisperModel(model_path, device='cpu', compute_type='int8', local_files_only=True)
+    tokenizer = Tokenizer(model.hf_tokenizer, model.model.is_multilingual, task='transcribe', language='fr')
+    words = align_text(model, tokenizer, np.zeros(3 * 16000, dtype=np.float32), 'Bonjour.')
+    assert ''.join(w['word'] for w in words).strip() == 'Bonjour.'
+    assert all(0 <= w['start'] <= w['end'] <= 3.1 for w in words)
+    del model
+    print('Real CPU forced alignment API passed (synthetic silence, no quality claim)')
 
 
 def timestamp_boundary_smoke(store, options, model_factory=None):
@@ -204,6 +221,22 @@ def editor_smoke():
         editor.speaker.setText('Alice')
         editor.save_edit()
         assert store.segments('editor-smoke')[0]['speaker'] == 'Alice'
+        from majimeeting.speaker_overview import SpeakerOverview
+        store.start_transcription('voices-smoke', meeting, TranscriptionOptions('unused'))
+        store.add_segment('voices-smoke', 'track-00', 1, 3, 'Bonjour oui', [
+            dict(start=1.1, end=1.8, word='Bonjour', probability=.9),
+            dict(start=2.1, end=2.8, word=' oui', probability=.9)])
+        store.finish_transcription('voices-smoke', 'completed')
+        voices = start_run(store, 'voices-smoke', {})
+        complete_run(store, voices, [dict(track='track-00', start=1, end=2, label='A'),
+                                     dict(track='track-00', start=2, end=3, label='B')])
+        assert len(store.segments('voices-smoke')) == 2
+        overview = SpeakerOverview(store, 'voices-smoke')
+        assert len(overview.groups) == 2 and overview.groups[0]['samples']
+        overview.names[0].setText('Alice')
+        overview.apply_names()
+        overview.close()
+        assert store.segments('voices-smoke')[0]['speaker'] == 'Alice'
         editor.accept()
         app.processEvents()
         path = folder / 'excerpt.wav'

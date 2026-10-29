@@ -94,8 +94,12 @@ def complete_run(store, run, turns):
                        [(run, t['track'], t['start'], t['end'], t['label']) for t in clean])
         by_track = {track: [t for t in clean if t['track'] == track] for track in tracks}
         for segment in segments:
-            label, ambiguous = match_turns(segment['start'], segment['end'], by_track[segment['track']])
+            local_turns = [t for t in by_track[segment['track']]
+                           if t['start'] < segment['end'] and t['end'] > segment['start']]
+            label, ambiguous = match_turns(segment['start'], segment['end'], local_turns)
             group = segment['track'] + ':' + label if label else ''
+            from majimeeting.speaker_pieces import write_pieces
+            write_pieces(db, run, segment, local_turns, label, ambiguous)
             db.execute('INSERT INTO speaker_assignments VALUES(?,?,?,?)',
                        (run, segment['id'], group, int(ambiguous)))
         db.execute("UPDATE diarization_runs SET status='completed' WHERE id=?", (run,))
@@ -109,8 +113,8 @@ def name_group(store, job, group, name):
         raise ValueError('Le nom est limité à 200 caractères.')
     with store.connect() as db:
         run = latest_run(db, job)
-        if not group or not db.execute('SELECT 1 FROM speaker_assignments WHERE run_id=? AND group_id=?',
-                                      (run, group)).fetchone():
+        if not group or not db.execute('SELECT 1 FROM speaker_turns WHERE run_id=? '
+                                      "AND track || ':' || label=?", (run, group)).fetchone():
             raise ValueError('Groupe de locuteurs introuvable.')
         db.execute('INSERT INTO speaker_names(run_id,group_id,name,created) VALUES(?,?,?,?)',
                    (run, group, name, datetime.now(UTC).isoformat()))
@@ -121,6 +125,9 @@ def history(store, job):
         runs = [dict(r) for r in db.execute('SELECT * FROM diarization_runs WHERE job_id=? ORDER BY rowid', (job,))]
         for run in runs:
             run['turns'] = [dict(r) for r in db.execute('SELECT * FROM speaker_turns WHERE run_id=?', (run['id'],))]
+            run['pieces'] = [dict(r) for r in db.execute('SELECT * FROM speaker_pieces WHERE run_id=?', (run['id'],))]
+            run['piece_edits'] = [dict(r) for r in db.execute('SELECT e.* FROM piece_edits e JOIN speaker_pieces p '
+                                                             'ON p.id=e.piece_id WHERE p.run_id=? ORDER BY e.id', (run['id'],))]
             run['names'] = [dict(r) for r in db.execute('SELECT * FROM speaker_names WHERE run_id=? ORDER BY id', (run['id'],))]
         return runs
 
@@ -138,8 +145,12 @@ def list_runs(store, job):
     with store.connect() as db:
         return [dict(row) for row in db.execute('''
             SELECT r.*,
-              (SELECT COUNT(*) FROM speaker_assignments WHERE run_id=r.id AND ambiguous=1) AS ambiguous,
-              (SELECT COUNT(*) FROM speaker_assignments WHERE run_id=r.id) AS segments,
+              CASE WHEN EXISTS(SELECT 1 FROM speaker_pieces WHERE run_id=r.id) THEN
+                (SELECT COUNT(*) FROM speaker_pieces WHERE run_id=r.id AND ambiguous=1) ELSE
+                (SELECT COUNT(*) FROM speaker_assignments WHERE run_id=r.id AND ambiguous=1) END AS ambiguous,
+              CASE WHEN EXISTS(SELECT 1 FROM speaker_pieces WHERE run_id=r.id) THEN
+                (SELECT COUNT(*) FROM speaker_pieces WHERE run_id=r.id) ELSE
+                (SELECT COUNT(*) FROM speaker_assignments WHERE run_id=r.id) END AS segments,
               (SELECT COUNT(*) FROM (SELECT track,label FROM speaker_turns
                 WHERE run_id=r.id GROUP BY track,label)) AS groups
             FROM diarization_runs r WHERE job_id=? ORDER BY r.rowid DESC

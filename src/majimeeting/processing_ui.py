@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from majimeeting.speaker_overview import speaker_display
 from majimeeting.transcription import (
     TranscriptionOptions,
     download_model,
@@ -128,7 +129,10 @@ class ProcessingPanel(QWidget):
         self.cpu_fallback = QCheckBox('Si CUDA est indisponible, reprendre sur CPU/int8')
         self.cpu_fallback.setChecked(self.settings.value('cpu_fallback', True, type=bool))
         layout.addWidget(self.cpu_fallback)
-        self.transcribe_button = QPushButton('Transcrire la réunion sélectionnée en français')
+        self.full_analysis = QPushButton('Transcrire et proposer les intervenants…')
+        self.full_analysis.clicked.connect(lambda: self.transcribe(complete=True))
+        layout.addWidget(self.full_analysis)
+        self.transcribe_button = QPushButton('Transcrire uniquement (avancé)')
         self.transcribe_button.clicked.connect(self.transcribe)
         layout.addWidget(self.transcribe_button)
         self.cancel_button = QPushButton('Annuler le traitement (après le segment en cours)')
@@ -155,6 +159,9 @@ class ProcessingPanel(QWidget):
         self.export_button = QPushButton('Exporter la transcription (TXT ou JSON)…')
         self.export_button.clicked.connect(self.export)
         layout.addWidget(self.export_button)
+        self.speaker_button = QPushButton('Nommer les intervenants à partir de courts extraits…')
+        self.speaker_button.clicked.connect(self.open_speakers)
+        layout.addWidget(self.speaker_button)
         self.edit_button = QPushButton('Corriger les textes, nommer les intervenants et réécouter…')
         self.edit_button.clicked.connect(self.open_editor)
         layout.addWidget(self.edit_button)
@@ -187,7 +194,8 @@ class ProcessingPanel(QWidget):
             from majimeeting.diarization_options import DiarizationOptions
             self.submit('diarize', diarize, self.window.store, job, python, model,
                         device, speakers, self.cancel, self.progress,
-                        tuning=DiarizationOptions(**tuning), cancellable=True)
+                        tuning=DiarizationOptions(**tuning), whisper_model_path=self.model.text().strip(),
+                        cancellable=True)
 
     def open_saved_transcript(self):
         from majimeeting.transcript_library import TranscriptLibrary
@@ -245,6 +253,11 @@ class ProcessingPanel(QWidget):
                    f"passages ambigus ; {timing}. Calcul : {options.get('device', '?')}. "
                    f"Exact : {options.get('speakers', 0)} ; réglages : {options.get('tuning', 'modèle')}. "
                    'Les corrections individuelles restent prioritaires. ')
+        alignment = options.get('word_alignment', {})
+        if alignment:
+            details += (f" Alignement du texte existant : {alignment.get('aligned', 0)} passage(s), "
+                        f"{alignment.get('unresolved', 0)} non résolu(s). "
+                        'Les passages sont découpés aux mots ; les voix simultanées restent à vérifier.')
         for track in options.get('tracks', []):
             effective = track.get('effective', {})
             devices = effective.get('devices', {})
@@ -284,7 +297,8 @@ class ProcessingPanel(QWidget):
         for widget in (self.open_saved, self.jobs, self.analyses, self.use_analysis,
                        self.import_button, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
-                       self.transcribe_button, self.export_button, self.edit_button, self.diarize_button,
+                       self.transcribe_button, self.full_analysis, self.speaker_button,
+                       self.export_button, self.edit_button, self.diarize_button,
                        self.batched, self.batch_size, self.quality, self.flash, self.workers, self.audio_window):
             widget.setEnabled(not active)
         if not active:
@@ -362,7 +376,7 @@ class ProcessingPanel(QWidget):
             self.submit('import', import_audio, self.window.store, path, self.cancel,
                         self.progress, cancellable=True)
 
-    def transcribe(self):
+    def transcribe(self, complete=False):
         if not self.current_meeting:
             self.window.status.setText('Sélectionnez d’abord une réunion.')
             return
@@ -388,8 +402,22 @@ class ProcessingPanel(QWidget):
         self.settings.setValue('window_seconds', self.audio_window.currentData())
         self.settings.setValue('cuda_path', options.cuda_library_path)
         self.settings.setValue('cpu_fallback', options.allow_cpu_fallback)
-        self.submit('transcribe', transcribe_meeting, self.window.store, self.current_meeting,
-                    options, self.cancel, self.progress, cancellable=True)
+        if complete:
+            from majimeeting.diarization_options import DiarizationOptions
+            from majimeeting.diarization_ui import DiarizationDialog
+            from majimeeting.meeting_pipeline import process_meeting
+            folder = self.window.store.root / self.current_meeting
+            tracks = sorted(p.name for p in folder.glob('track-*') if p.is_dir())
+            dialog = DiarizationDialog(self, tracks=tracks, transcribe_first=True)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                return
+            python, model, device, speakers, tuning = dialog.values()
+            self.submit('meeting-analysis', process_meeting, self.window.store, self.current_meeting,
+                        options, python, model, device, speakers, DiarizationOptions(**tuning),
+                        self.cancel, self.progress, cancellable=True)
+        else:
+            self.submit('transcribe', transcribe_meeting, self.window.store, self.current_meeting,
+                        options, self.cancel, self.progress, cancellable=True)
 
     def selected(self):
         item = self.window.meetings.currentItem()
@@ -466,8 +494,17 @@ class ProcessingPanel(QWidget):
                                    'Voir les avertissements pour vérifier ces passages.')
         self.text.setPlainText('\n'.join(
             f"[{timestamp(row['start'])} → {timestamp(row['end'])}] "
-            f"{row['speaker'] or 'Inconnu'} ({row['track']}) : {row['corrected_text']}"
+            f"{speaker_display(row)} ({row['track']}) : {row['corrected_text']}"
             for row in self.window.store.segments(job)) if job else '')
+
+    def open_speakers(self):
+        job = self.jobs.currentData()
+        if not job:
+            return
+        from majimeeting.speaker_overview import SpeakerOverview
+        dialog = SpeakerOverview(self.window.store, job, self)
+        dialog.exec()
+        self.show_transcript()
 
     def open_editor(self):
         job = self.jobs.currentData()
@@ -521,9 +558,15 @@ class ProcessingPanel(QWidget):
         with self.window.store.connect() as db:
             details = json.loads(db.execute('SELECT options FROM transcription_jobs WHERE id=?',
                                            (job,)).fetchone()['options'])
+            sources = [dict(r) for r in db.execute('SELECT * FROM transcript_segments WHERE job_id=?', (job,))]
+            words = [dict(r) for r in db.execute('SELECT w.* FROM transcript_words w JOIN transcript_segments s '
+                                                'ON s.id=w.segment_id WHERE s.job_id=? ORDER BY s.id,w.position', (job,))]
+            corrections = [dict(r) for r in db.execute('SELECT e.* FROM segment_edits e JOIN transcript_segments s '
+                                                      'ON s.id=e.segment_id WHERE s.job_id=? ORDER BY e.id', (job,))]
         if Path(path).suffix.lower() == '.json':
             from majimeeting.speakers import history
-            text = json.dumps({'job_id': job, 'segments': rows,
+            text = json.dumps({'job_id': job, 'segments': rows, 'source_segments': sources,
+                               'word_timestamps': words, 'source_corrections': corrections,
                                'diarization': history(self.window.store, job),
                                'execution': details.get('execution', {}),
                                'performance': details.get('metrics', {}),
@@ -532,7 +575,7 @@ class ProcessingPanel(QWidget):
                               ensure_ascii=False, indent=2)
         else:
             text = '\n'.join(f"[{timestamp(r['start'])} → {timestamp(r['end'])}] "
-                             f"{r['speaker'] or 'Inconnu'} ({r['track']}) : {r['text']}" for r in rows)
+                             f"{speaker_display(r)} ({r['track']}) : {r['text']}" for r in rows)
         if Path(path).suffix.lower() != '.json':
             count = sum(self.window.store.warning_counts(job).values())
             if count:
