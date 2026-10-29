@@ -34,9 +34,9 @@ def _digest(path, algorithm, cancel, progress):
 
 
 def download_model(destination, cancel=None, progress=lambda message, percent=None: None,
-                   model_name='large-v3', session_factory=requests.Session):
-    """Download a pinned public Systran model; verify every file before promoting it."""
-    if model_name not in {'large-v3', 'tiny'}:
+                   model_name='large-v3', session_factory=requests.Session, token=''):
+    """Download an allowed model at a fixed revision; verify every promoted file."""
+    if model_name not in {'large-v3', 'tiny', 'community-1'}:
         raise ValueError('Modèle de téléchargement non pris en charge.')
     _cancel(cancel)
     destination = Path(destination).expanduser()
@@ -50,13 +50,21 @@ def download_model(destination, cancel=None, progress=lambda message, percent=No
     def report(message, percent=None):
         progress(message, percent)
 
-    repo = f'Systran/faster-whisper-{model_name}'
+    community = model_name == 'community-1'
+    repo = ('pyannote/speaker-diarization-community-1' if community else
+            f'Systran/faster-whisper-{model_name}')
+    required = ({'config.yaml', 'embedding/pytorch_model.bin',
+                 'segmentation/pytorch_model.bin', 'plda/plda.npz',
+                 'plda/xvec_transform.npz'} if community else REQUIRED)
+    allowed_files = required if community else FILES
     try:
         log(f'Start {repo}')
         report('Connexion au serveur de modèles… (connexion 10 s, lecture 15 s maximum sans réponse)')
         with session_factory() as session:
             session.headers.update({'User-Agent': 'MAJIMeeting-model-downloader/0.2.1',
                                     'Accept-Encoding': 'identity'})
+            if community and token:
+                session.headers['Authorization'] = 'Bearer ' + token.strip()
             with session.get(f'https://huggingface.co/api/models/{repo}/revision/main',
                              params={'blobs': 'true'}, timeout=TIMEOUT) as response:
                 response.raise_for_status()
@@ -68,7 +76,7 @@ def download_model(destination, cancel=None, progress=lambda message, percent=No
             files = []
             for entry in metadata.get('siblings', []):
                 name = entry.get('rfilename')
-                if name not in FILES:
+                if name not in allowed_files:
                     continue
                 size = entry.get('size')
                 lfs = entry.get('lfs') or {}
@@ -79,7 +87,7 @@ def download_model(destination, cancel=None, progress=lambda message, percent=No
                         not re.fullmatch(f'[0-9a-f]{{{length}}}', checksum)):
                     raise ValueError(f'Métadonnées incomplètes pour {name}.')
                 files.append((name, size, algorithm, checksum))
-            if not REQUIRED.issubset({f[0] for f in files}):
+            if not required.issubset({f[0] for f in files}):
                 raise ValueError('La liste du modèle ne contient pas les fichiers indispensables.')
             # Small configuration first; model.bin last. Never delete an existing complete model.
             files.sort(key=lambda f: (f[0] == 'model.bin', f[0]))
@@ -89,6 +97,7 @@ def download_model(destination, cancel=None, progress=lambda message, percent=No
             for name, size, algorithm, checksum in files:
                 _cancel(cancel)
                 target = destination / name
+                target.parent.mkdir(parents=True, exist_ok=True)
                 part = destination / (name + '.part')
                 state = destination / (name + '.part.json')
                 identity = {'size': size, 'algorithm': algorithm, 'checksum': checksum}
@@ -152,7 +161,7 @@ def download_model(destination, cancel=None, progress=lambda message, percent=No
                 log(f'Verified {name}')
             manifest = {'repository': repo, 'revision': revision, 'files': [f[0] for f in files]}
             (destination / 'download-manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
-        report('Modèle téléchargé et vérifié. Prêt pour la transcription hors ligne.', 100)
+        report('Modèle téléchargé et vérifié. Prêt pour l’utilisation hors ligne.', 100)
         log('Completed')
         return str(destination)
     except CancelledError:
@@ -166,6 +175,9 @@ def download_model(destination, cancel=None, progress=lambda message, percent=No
         status = getattr(getattr(exc, 'response', None), 'status_code', None)
         detail = f'HTTP {status}' if status else type(exc).__name__
         log(f'Network error: {detail}')
+        if community and status in {401, 403}:
+            raise RuntimeError('Accès Community-1 refusé. Acceptez les conditions sur Hugging Face '
+                               'et utilisez un jeton de lecture autorisé. Aucun jeton n’est enregistré.') from None
         raise RuntimeError(f'Échec de connexion au serveur de modèles ({detail}). '
                            f'Vérifiez la connexion et le proxy. Journal : {log_path}') from exc
     except Exception as exc:

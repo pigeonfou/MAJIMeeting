@@ -16,11 +16,12 @@ if (-not (Test-Path $python)) {
 & $python -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw 'Installation de pip impossible.' }
 $index = if ($Device -eq 'cuda') { 'https://download.pytorch.org/whl/cu128' } else { 'https://download.pytorch.org/whl/cpu' }
-& $python -m pip install 'torch==2.8.0' 'torchaudio==2.8.0' --index-url $index
+$variant = if ($Device -eq 'cuda') { 'cu128' } else { 'cpu' }
+& $python -m pip install "torch==2.8.0+$variant" "torchaudio==2.8.0+$variant" --index-url $index
 if ($LASTEXITCODE -ne 0) { throw 'Installation de PyTorch impossible.' }
 & $python -m pip install 'pyannote.audio==4.0.7' 'torchcodec==0.7.0' 'huggingface-hub>=0.28.1,<2'
 if ($LASTEXITCODE -ne 0) { throw 'Installation de Community-1 impossible.' }
-& $python -c 'import torch; from pyannote.audio import Pipeline; print("Runtime importe, CUDA disponible:", torch.cuda.is_available())'
+& $python -c 'import sys, torch; from pyannote.audio import Pipeline; print("Runtime importe, CUDA disponible:", torch.cuda.is_available()); sys.exit("CUDA indisponible : verifiez le pilote NVIDIA ou choisissez CPU." if sys.argv[1] == "cuda" and not torch.cuda.is_available() else 0)' $Device
 if ($LASTEXITCODE -ne 0) { throw 'Le runtime ne peut pas charger pyannote.audio.' }
 if (-not $SkipModel) {
     Write-Host 'Acceptez les conditions sur https://huggingface.co/pyannote/speaker-diarization-community-1 avant de continuer.'
