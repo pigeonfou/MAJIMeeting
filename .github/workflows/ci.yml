@@ -143,7 +143,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-installed'
-          $setup = Start-Process dist/MAJIMeeting-0.2.8-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          $setup = Start-Process dist/MAJIMeeting-0.2.9-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installation failed: $($setup.ExitCode)" }
           if (-not (Test-Path "$target/setup_diarization_runtime.py")) { throw "Missing runtime helper" }
           if (-not (Test-Path "$target/setup-diarization.ps1")) { throw "Missing runtime setup script" }
@@ -184,7 +184,7 @@ jobs:
         with:
           name: MAJIMeeting-Windows-preview
           path: |
-            dist/MAJIMeeting-0.2.8-preview-Setup.exe
+            dist/MAJIMeeting-0.2.9-preview-Setup.exe
             dist/build-manifest.json
           if-no-files-found: error
           overwrite: true

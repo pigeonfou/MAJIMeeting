@@ -1,7 +1,7 @@
 [Setup]
 AppId=MAJIMeeting
 AppName=MAJIMeeting
-AppVersion=0.2.8
+AppVersion=0.2.9
 AppPublisher=MAJIMeeting
 DefaultDirName={localappdata}\Programs\MAJIMeeting
 DefaultGroupName=MAJIMeeting
@@ -9,7 +9,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=MAJIMeeting-0.2.8-preview-Setup
+OutputBaseFilename=MAJIMeeting-0.2.9-preview-Setup
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\MAJIMeeting.exe
