@@ -53,3 +53,10 @@ plan et publication réussis en 31 secondes, test et windows-package sautés. La
 v0.2.6-preview.42 publie l'EXE de cette PR et son manifeste ; digest GitHub de l'asset
 identique au SHA-256 enregistré et vérifié avant publication. Aucun changement des
 fonctions de l'application ni besoin de réinstaller pour cette modification de CI.
+
+
+## Canal source DEV (0.2.12)
+
+Le workflow `dev-channel.yml` prend en charge les changements courants sans PyInstaller. Voir [DEV_CHANNEL.md](DEV_CHANNEL.md). Le workflow historique `ci.yml` ne démarre automatiquement que pour packaging, pyproject (version/dépendances), son propre YAML et les scripts de promotion/manifeste. Un lancement manuel sur main construit et publie aussi un installateur. Les corrections DEV gardent la version de distribution et sont identifiées par commit ; une montée de version reste une publication d'installateur volontaire.
+
+Les dépendances du canal Windows sont figées séparément ; le bootstrap n'est réinstallé en CI que si les fichiers du gestionnaire/requirements changent. Les tests et vérifications source, interface et inférence réelle continuent sur chaque changement de code. Une mise à jour d'environnement sur PC se fait dans un nouveau dossier par empreinte, avec activation seulement après succès.

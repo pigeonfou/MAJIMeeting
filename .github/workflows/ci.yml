@@ -2,8 +2,10 @@ name: CI
 on:
   push:
     branches: [main]
+    paths: ['packaging/**', 'pyproject.toml', '.github/workflows/ci.yml', '.github/scripts/promotion*', '.github/scripts/build_manifest.py']
   pull_request:
     branches: [main]
+    paths: ['packaging/**', 'pyproject.toml', '.github/workflows/ci.yml', '.github/scripts/promotion*', '.github/scripts/build_manifest.py']
   workflow_dispatch:
 permissions:
   contents: read
@@ -143,7 +145,7 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-installed'
-          $setup = Start-Process dist/MAJIMeeting-0.2.11-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          $setup = Start-Process dist/MAJIMeeting-0.2.12-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installation failed: $($setup.ExitCode)" }
           if (-not (Test-Path "$target/setup_diarization_runtime.py")) { throw "Missing runtime helper" }
           if (-not (Test-Path "$target/setup-diarization.ps1")) { throw "Missing runtime setup script" }
@@ -184,13 +186,13 @@ jobs:
         with:
           name: MAJIMeeting-Windows-preview
           path: |
-            dist/MAJIMeeting-0.2.11-preview-Setup.exe
+            dist/MAJIMeeting-0.2.12-preview-Setup.exe
             dist/build-manifest.json
           if-no-files-found: error
           overwrite: true
   preview-release:
     if: >-
-      always() && github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' &&
       needs.plan.result == 'success' &&
       (needs.plan.outputs.reuse == 'true' || needs.windows-package.result == 'success')
     needs: [plan, windows-package]

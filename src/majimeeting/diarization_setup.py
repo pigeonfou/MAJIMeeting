@@ -12,7 +12,9 @@ from majimeeting.model_download import _cancel, download_model
 
 
 def default_runtime():
-    return Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MAJIMeeting/runtime'
+    root = Path(os.environ.get('LOCALAPPDATA', str(Path.home())))
+    return root / ('MAJIMeeting-DEV/diarization-runtime'
+                   if os.environ.get('MAJIMEETING_CHANNEL') == 'dev' else 'MAJIMeeting/runtime')
 
 
 def setup_script():

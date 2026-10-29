@@ -1,9 +1,9 @@
-# MAJIMeeting 0.2.11 — découpage aux voix et nomination rapide
+# MAJIMeeting 0.2.12 — canal Windows DEV sans compilation
 
-- Parcours « Transcrire et proposer les intervenants » : transcription mot à mot, diarisation puis nomination des groupes avec de courts extraits.
-- Découpage du texte lorsque les voix se succèdent dans un même segment. Les paroles simultanées restent signalées avec les groupes possibles.
-- Jusqu'à trois extraits isolés par groupe, 12 secondes maximum ; noms appliqués à tous les passages correspondants et filtre des passages à vérifier.
-- Réutilisation d'une transcription existante : alignement du texte original sans le redécoder, puis conservation des mots pour les essais suivants.
-- Originaux et historique conservés, corrections protégées et export JSON enrichi.
+- Nouveau canal source : environnement Python permanent, mises à jour par commit validé et retour à la version précédente.
+- Données et paramètres DEV isolés, copie explicite des réunions habituelles avec leurs audios, modèles existants réutilisés.
+- Raccourcis pour lancer, mettre à jour et lancer, revenir en arrière et copier les réunions.
+- Paquet d'installation DEV séparé dans les releases `dev-<commit>` ; Python3.11x64 requis. Voir docs/DEV_CHANNEL.md.
+- Les changements courants de code ne reconstruisent plus l'EXE. Ce premier jalon conserve une construction complète pour valider la coexistence.
 
-Installer par-dessus0.2.10. Aucun nouveau modèle nécessaire ; Whisper et Community-1 locaux restent requis. Pour une ancienne transcription, rouvrir puis relancer la diarisation avec le modèle Whisper sélectionné. L'alignement mot à mot ajoute du calcul. Les voix simultanées et les erreurs de regroupement ne sont pas résolues avec certitude ; qualité et performances sur vos réunions restent à vérifier.
+La transcription et la diarisation0.2.11 sont conservées. Les contrôles automatiques ne remplacent pas l'essai CUDA et WASAPI du nouveau canal sur votre PC. Le changement de distribution n'accélère pas les modèles IA.

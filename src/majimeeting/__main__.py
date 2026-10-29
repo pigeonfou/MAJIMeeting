@@ -1,8 +1,6 @@
 """Native Windows recording interface."""
-import os
 import sys
 from concurrent.futures import CancelledError, ThreadPoolExecutor
-from pathlib import Path
 
 from PySide6.QtCore import QLockFile, Qt, QTimer
 from PySide6.QtWidgets import (
@@ -25,6 +23,7 @@ from PySide6.QtWidgets import (
 
 from majimeeting.capture import RecordingSession, WasapiBackend
 from majimeeting.processing_ui import ProcessingPanel
+from majimeeting.runtime_context import data_root, window_title
 from majimeeting.storage import MeetingStore, export_track
 
 
@@ -43,7 +42,7 @@ class MainWindow(QMainWindow):
         self.session = None
         self.task = None
         self.pool = ThreadPoolExecutor(max_workers=1)
-        self.setWindowTitle("MAJIMeeting — Enregistrement et transcription")
+        self.setWindowTitle(window_title())
         self.resize(1000, 700)
         body = QWidget()
         layout = QVBoxLayout(body)
@@ -250,7 +249,7 @@ def main() -> int:
         return inference_smoke(sys.argv[sys.argv.index('--inference-smoke') + 1])
     app = QApplication(sys.argv)
     app.setApplicationName("MAJIMeeting")
-    root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "MAJIMeeting" / "data"
+    root = data_root()
     root.mkdir(parents=True, exist_ok=True)
     lock = QLockFile(str(root / "application.lock"))
     if not lock.tryLock(0):
