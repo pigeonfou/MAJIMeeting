@@ -533,3 +533,7 @@ stable restent à réaliser.
 - Script corrigé : sélection explicite des variantes torch/torchaudio CPU ou cu128 pour ne pas conserver par erreur une installation CPU lors du passage CUDA ; CUDA vérifié si demandé.
 - Tests locaux : 108 tests normaux réussis, Ruff réussi ; smoke Qt éditeur/lecture réussi. Tests nouveaux : empreintes/arborescence/reprise Community-1, secrets absents des fichiers, refus gated, arguments d'installation, sortie/annulation processus, boutons asynchrones/chemins/fermeture.
 - À vérifier : CI Windows/Linux, appel réel du même backend d'installation CPU sur Windows, installateur0.2.8. Téléchargement réel gated et exécution Community-1 CUDA sur PC utilisateur restent à réaliser.
+
+
+- Première CI 40859979027 : tests Windows/Linux réussis ; échec du contrôle runtime sous Windows PowerShell 5, `SyntaxError: '(' was never closed` après troncature de la commande Python `-c`. Même problème confirmé sur la capture utilisateur0.2.7. Aucun installateur0.2.8 publié à ce stade.
+- Correction : vérifications/téléchargement historique/validation déplacés dans un fichier Python auxiliaire livré avec le script ; plus de code Python passé dans les guillemets de PowerShell5. CI relancée sur le même backend utilisé par le bouton.

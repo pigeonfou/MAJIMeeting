@@ -21,20 +21,15 @@ $variant = if ($Device -eq 'cuda') { 'cu128' } else { 'cpu' }
 if ($LASTEXITCODE -ne 0) { throw 'Installation de PyTorch impossible.' }
 & $python -m pip install 'pyannote.audio==4.0.7' 'torchcodec==0.7.0' 'huggingface-hub>=0.28.1,<2'
 if ($LASTEXITCODE -ne 0) { throw 'Installation de Community-1 impossible.' }
-& $python -c 'import sys, torch; from pyannote.audio import Pipeline; print("Runtime importe, CUDA disponible:", torch.cuda.is_available()); sys.exit("CUDA indisponible : verifiez le pilote NVIDIA ou choisissez CPU." if sys.argv[1] == "cuda" and not torch.cuda.is_available() else 0)' $Device
-if ($LASTEXITCODE -ne 0) { throw 'Le runtime ne peut pas charger pyannote.audio.' }
+$helper = Join-Path $PSScriptRoot 'setup_diarization_runtime.py'
+if (-not (Test-Path $helper)) { throw 'Fichier de verification absent ; reinstallez MAJIMeeting.' }
+& $python $helper check --device $Device
+if ($LASTEXITCODE -ne 0) { throw 'Le runtime ne peut pas charger pyannote.audio ou le GPU demande.' }
 if (-not $SkipModel) {
     Write-Host 'Acceptez les conditions sur https://huggingface.co/pyannote/speaker-diarization-community-1 avant de continuer.'
-    $download = @'
-import getpass, sys
-from huggingface_hub import snapshot_download
-snapshot_download('pyannote/speaker-diarization-community-1',
-                  token=getpass.getpass('Jeton Hugging Face (lecture, non conserve): '), local_dir=sys.argv[1])
-'@
-    & $python -c $download $ModelRoot
+    & $python $helper download --model $ModelRoot
     if ($LASTEXITCODE -ne 0) { throw 'Telechargement refuse ou interrompu ; verifiez les conditions et votre jeton.' }
-    $env:HF_HUB_OFFLINE = '1'
-    & $python -c 'import sys; from pyannote.audio import Pipeline; Pipeline.from_pretrained(sys.argv[1]); print("Modele local charge hors ligne")' $ModelRoot
+    & $python $helper validate --model $ModelRoot
     if ($LASTEXITCODE -ne 0) { throw 'Le modele local ne peut pas etre charge hors ligne.' }
 }
 Write-Host "Runtime : $python"

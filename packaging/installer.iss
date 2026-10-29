@@ -19,6 +19,8 @@ Source: "..\dist\MAJIMeeting\*"; DestDir: "{app}"; Flags: ignoreversion recurses
 
 Source: "..\scripts\setup-diarization.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
+Source: "..\scripts\setup_diarization_runtime.py"; DestDir: "{app}"; Flags: ignoreversion
+
 [Icons]
 Name: "{group}\MAJIMeeting"; Filename: "{app}\MAJIMeeting.exe"
 Name: "{userdesktop}\MAJIMeeting"; Filename: "{app}\MAJIMeeting.exe"; Tasks: desktopicon
