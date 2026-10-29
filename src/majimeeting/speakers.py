@@ -10,6 +10,8 @@ def schema(db):
         CREATE TABLE IF NOT EXISTS diarization_runs (
           id TEXT PRIMARY KEY, job_id TEXT NOT NULL, created TEXT NOT NULL,
           status TEXT NOT NULL, options TEXT NOT NULL, error TEXT NOT NULL DEFAULT '');
+        CREATE TABLE IF NOT EXISTS diarization_selection (
+          job_id TEXT PRIMARY KEY, run_id TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS speaker_turns (
           id INTEGER PRIMARY KEY, run_id TEXT NOT NULL, track TEXT NOT NULL,
           start REAL NOT NULL, end REAL NOT NULL, label TEXT NOT NULL);
@@ -25,6 +27,11 @@ def schema(db):
 
 
 def latest_run(db, job):
+    selected = db.execute("SELECT r.id FROM diarization_selection s JOIN diarization_runs r "
+                          "ON r.id=s.run_id AND r.job_id=s.job_id "
+                          "WHERE s.job_id=? AND r.status='completed'", (job,)).fetchone()
+    if selected:
+        return selected['id']
     row = db.execute("SELECT id FROM diarization_runs WHERE job_id=? AND status='completed' "
                      'ORDER BY rowid DESC LIMIT 1', (job,)).fetchone()
     return row['id'] if row else ''
@@ -92,6 +99,7 @@ def complete_run(store, run, turns):
             db.execute('INSERT INTO speaker_assignments VALUES(?,?,?,?)',
                        (run, segment['id'], group, int(ambiguous)))
         db.execute("UPDATE diarization_runs SET status='completed' WHERE id=?", (run,))
+        db.execute('INSERT OR REPLACE INTO diarization_selection VALUES(?,?)', (record['job_id'], run))
     return run
 
 
@@ -115,3 +123,24 @@ def history(store, job):
             run['turns'] = [dict(r) for r in db.execute('SELECT * FROM speaker_turns WHERE run_id=?', (run['id'],))]
             run['names'] = [dict(r) for r in db.execute('SELECT * FROM speaker_names WHERE run_id=? ORDER BY id', (run['id'],))]
         return runs
+
+
+def select_run(store, job, run):
+    """Select an existing completed analysis, retaining every name and correction."""
+    with store.connect() as db:
+        if not db.execute("SELECT 1 FROM diarization_runs WHERE id=? AND job_id=? "
+                          "AND status='completed'", (run, job)).fetchone():
+            raise ValueError('Analyse terminée introuvable pour cette transcription.')
+        db.execute('INSERT OR REPLACE INTO diarization_selection VALUES(?,?)', (job, run))
+
+
+def list_runs(store, job):
+    with store.connect() as db:
+        return [dict(row) for row in db.execute('''
+            SELECT r.*,
+              (SELECT COUNT(*) FROM speaker_assignments WHERE run_id=r.id AND ambiguous=1) AS ambiguous,
+              (SELECT COUNT(*) FROM speaker_assignments WHERE run_id=r.id) AS segments,
+              (SELECT COUNT(*) FROM (SELECT track,label FROM speaker_turns
+                WHERE run_id=r.id GROUP BY track,label)) AS groups
+            FROM diarization_runs r WHERE job_id=? ORDER BY r.rowid DESC
+        ''', (job,))]

@@ -565,3 +565,16 @@ stable restent à réaliser.
 - [Publication 40884943912](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40884943912) réussie ; [v0.2.9-preview.51](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.9-preview.51) disponible. SHA-256 installateur : `84211b84725c9d974bf880cd102c340edbcff397a0ebbb348c1d10a46c657b16`.
 - Le texte automatique de la release reprend encore l'ancienne note 0.2.6 ; le fichier RELEASE_PREVIEW est actualisé ci-dessous pour les prochaines publications. Le binaire 0.2.9 est bien celui testé par la PR13.
 - À réaliser : relancer la diarisation réelle sur la réunion utilisateur avec la correction, vérifier les groupes, les chevauchements et l'absence de réseau.
+
+
+### 29 octobre 2026 — réglages et itérations de diarisation (0.2.10)
+
+- Demandes utilisateur : ajuster la reconnaissance/regroupement des voix, ouvrir une transcription existante pour éviter de refaire Whisper ; capture pendant diarisation montrant CPU67% / NVIDIA0%, insuffisante pour déterminer le placement réel des réseaux.
+- Réglages validés contre le code pyannote.audio4.0.7 : nombre exact ou bornes, exceptions par piste, seuil initial VBx, Fa/Fb, comblement de pauses, exclusion des chevauchements pour les empreintes et tailles de lots. Options avancées désactivées par défaut pour conserver le modèle local. Paramètres effectifs enregistrés par piste.
+- Navigateur de transcriptions enregistrées, recherche et réouverture sans calcul. Sélection d'une transcription ancienne conservée pendant les rechargements et au redémarrage.
+- Historique d'analyses avec réglages, groupes, ambiguïtés et durée ; restauration d'un résultat antérieur par sélection persistée additive SQLite. Noms propres à chaque analyse et corrections individuelles conservés. Pas d'identification certaine ni de transfert automatique des noms vers de nouveaux groupes.
+- Diagnostic diarisation distinct de Whisper : étapes en direct, périphériques du pipeline et des deux réseaux vérifiés, nom du GPU, pic de mémoire Torch conservés. CUDA demandé avec réseau encore sur CPU provoque une erreur explicite. Regroupement CPU annoncé, sans promettre une exécution 100% GPU.
+- Tests ajoutés : validation des paramètres, conservation des valeurs locales avec surcharges partielles, routage par piste, réouverture/redémarrage, restauration d'analyses/noms, lancement GUI sans Whisper, protocole subprocess, exécution du worker avec doublures CPU/CUDA (ne valide pas le GPU réel). Contrôle de l'EXE installé étendu aux nouveaux écrans.
+- À réaliser : validation finale locale et CI, puis essai réel sur PC utilisateur, qualité des voix et impact des paramètres sur réunions représentatives. Aucun gain de qualité ou de vitesse GPU déclaré à ce stade.
+
+- Validation locale : suite complète 132 tests réussis, puis 18 tests ciblés réussis après ajout du cas réseau laissé sur CPU ; Ruff et contrôle Qt éditeur/lecture réussis. Les contrôles utilisent des doublures pour Community-1 et ne constituent pas une validation du modèle/GPU réel.

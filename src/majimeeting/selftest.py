@@ -183,8 +183,17 @@ def editor_smoke():
         store.finish_transcription('editor-smoke', 'completed')
         from majimeeting.diarization_ui import DiarizationDialog
         from majimeeting.speakers import complete_run, name_group, start_run
-        configuration = DiarizationDialog()
+        from majimeeting.transcript_library import TranscriptLibrary
+        configuration = DiarizationDialog(tracks=['track-00'])
+        configuration.controls.speakers.setValue(2)
+        assert configuration.controls.values()['threshold'] is None
+        configuration.controls.clustering.setChecked(True)
+        configuration.controls.threshold.setValue(.7)
+        assert configuration.controls.values()['threshold'] == .7
         configuration.close()
+        catalogue = TranscriptLibrary(store)
+        assert catalogue.job() == 'editor-smoke'
+        catalogue.close()
         run = start_run(store, 'editor-smoke', {'engine': 'synthetic-packaging-check'})
         complete_run(store, run, [dict(track='track-00', start=1, end=2, label='SPEAKER_00')])
         name_group(store, 'editor-smoke', 'track-00:SPEAKER_00', 'Groupe témoin')

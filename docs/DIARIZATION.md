@@ -82,3 +82,34 @@ restent dans l'export JSON avec l'historique des analyses et des noms.
 
 Sources primaires : fiche modèle Community-1 ci-dessus (usage local, waveform et sorties
 régulières/exclusives), dépendances pyannote.audio 4.0.7 sur PyPI et télémétrie pyannote.audio.
+
+
+## Réglages et essais successifs (0.2.10)
+
+Dans **Import et transcription**, **Ouvrir une transcription existante…** liste les transcriptions terminées de la base locale, avec recherche par réunion/date. Cette action ne lance ni import ni Whisper. Les textes, corrections, pistes et analyses sont réutilisés. La dernière transcription ouverte est retrouvée au démarrage. Conserver le répertoire de données et l'audio d'origine : un export TXT seul ne permet pas de refaire la diarisation.
+
+**Distinguer / réessayer…** ouvre désormais deux onglets : réglages de l'analyse et préparation du modèle/dépendances. Les réglages sont conservés ; sélectionner une ancienne analyse permet de reprendre ses réglages. Les options avancées décochées conservent les valeurs du modèle local, sans réécrire son config.yaml.
+
+- **Nombre exact OU minimum/maximum** : 0 laisse le modèle décider. Un réglage spécifique par piste permet par exemple un seul locuteur au micro et plusieurs sur Teams. Ne pas compter deux fois une même personne, et ne pas imposer le nombre global de personnes à toutes les pistes.
+- **Seuil initial VBx** (0,5–0,8), **Fa** (0,01–0,5) et **Fb** (0,01–15) : paramètres pris en charge par Community-1/pyannote.audio4.0.7. Le seuil augmente la fusion lors du regroupement initial ; VBx intervient ensuite, le nombre final n'est donc pas garanti. Les valeurs affichées à l'activation manuelle (0,6 / 0,07 / 0,8) sont les références du code pyannote4.0.7, pas une lecture du fichier config local. Les paramètres effectivement appliqués sont enregistrés pour chaque piste.
+- **Comblement des silences** : durée minimale de pause conservée, 0–1 seconde. Augmenter comble des interruptions courtes ; cela peut modifier les limites de parole.
+- **Chevauchements et empreintes** : laisser le modèle décider, ou inclure/exclure les voix superposées lors de l'extraction des empreintes. L'exclusion ne supprime pas l'audit des chevauchements.
+- **Lots segmentation / empreintes** : 0 conserve le modèle, 1–64 règle débit et mémoire. Ces réglages ne garantissent pas une meilleure qualité. Pas de reprise OOM automatique pour cette première intégration : réduire les lots puis réessayer. Les réglages Whisper restent distincts.
+
+L'historique des essais conserve date, statut, nombre de groupes et passages ambigus, durée totale, réglages demandés et effectifs par piste. **Revenir au résultat de cette analyse** réaffiche une analyse terminée, avec ses noms de groupes. La sélection survit au redémarrage. Une nouvelle analyse réussie devient celle affichée ; un échec ne remplace pas la précédente. Les corrections individuelles de texte et de noms restent prioritaires, même en réanalysant. Les noms attribués aux groupes ne sont pas automatiquement transférés à de nouveaux groupes : cela supposerait une identification certaine non démontrée.
+
+### Diagnostiquer CPU et CUDA
+
+Le choix CUDA de Whisper ne configure pas le runtime pyannote. Dans le dialogue de diarisation, choisir **cuda**. L'application vérifie CUDA puis le placement du pipeline et des réseaux segmentation/empreintes ; elle refuse de continuer si CUDA était demandé et qu'un réseau reste sur CPU. Elle affiche les étapes et le nom du GPU, puis conserve les périphériques effectifs et le pic mémoire allouée par Torch dans l'historique/JSON. Les intervalles entre notifications des hooks sont conservés à titre de diagnostic, pas comme mesure précise du temps GPU.
+
+La préparation PCM, la collecte de résultats, le regroupement VBx/PLDA et certaines opérations d'empreintes utilisent le CPU. Une période CPU chargée et GPU peu actif ne prouve donc pas un repli CPU de l'ensemble du pipeline. Le graphique 3D du Gestionnaire des tâches n'est pas une mesure fiable de CUDA ; sélectionner NVIDIA puis CUDA/Compute. Le pourcentage d'occupation GPU instantané n'est pas mesuré par MAJIMeeting.
+
+### Premier protocole de comparaison
+
+1. Ouvrir la transcription existante, conserver les réglages modèle et noter les groupes/passages problématiques.
+2. Si le nombre de voix est connu, régler ce nombre sur la bonne piste et relancer seulement la diarisation.
+3. Si une voix est fragmentée en plusieurs groupes, comparer un seul changement de seuil à la fois (par exemple0,60 puis0,65), en gardant Fa/Fb et les autres contrôles fixes. Ne pas confondre fusion indue de deux personnes et amélioration.
+4. Réécouter les mêmes passages, vérifier aussi les changements de voix et chevauchements. Un total de groupes ou de passages ambigus plus faible ne prouve pas une meilleure qualité.
+5. Revenir à un essai précédent si nécessaire ; les analyses et corrections ne sont pas effacées.
+
+Références d'implémentation : [SpeakerDiarization4.0.7](https://github.com/pyannote/pyannote-audio/blob/4.0.7/src/pyannote/audio/pipelines/speaker_diarization.py), [VBxClustering4.0.7](https://github.com/pyannote/pyannote-audio/blob/4.0.7/src/pyannote/audio/pipelines/clustering.py), [placement des pipelines](https://github.com/pyannote/pyannote-audio/blob/4.0.7/src/pyannote/audio/core/pipeline.py).

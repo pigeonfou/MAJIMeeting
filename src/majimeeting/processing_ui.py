@@ -47,6 +47,9 @@ class ProcessingPanel(QWidget):
         layout = QVBoxLayout(self)
         self.selection = QLabel('Sélectionnez une réunion dans l’onglet Enregistrement.')
         layout.addWidget(self.selection)
+        self.open_saved = QPushButton('Ouvrir une transcription existante…')
+        self.open_saved.clicked.connect(self.open_saved_transcript)
+        layout.addWidget(self.open_saved)
         self.import_button = QPushButton('Importer un fichier WAV, MP3, FLAC ou M4A…')
         self.import_button.clicked.connect(self.import_file)
         layout.addWidget(self.import_button)
@@ -155,7 +158,17 @@ class ProcessingPanel(QWidget):
         self.edit_button = QPushButton('Corriger les textes, nommer les intervenants et réécouter…')
         self.edit_button.clicked.connect(self.open_editor)
         layout.addWidget(self.edit_button)
-        self.diarize_button = QPushButton('Distinguer automatiquement les interlocuteurs…')
+        layout.addWidget(QLabel('Essais de diarisation — paramètres et résultats conservés'))
+        self.analyses = QComboBox()
+        self.analyses.currentIndexChanged.connect(self.show_analysis)
+        layout.addWidget(self.analyses)
+        self.analysis_details = QLabel('')
+        self.analysis_details.setWordWrap(True)
+        layout.addWidget(self.analysis_details)
+        self.use_analysis = QPushButton('Revenir au résultat de cette analyse')
+        self.use_analysis.clicked.connect(self.activate_analysis)
+        layout.addWidget(self.use_analysis)
+        self.diarize_button = QPushButton('Distinguer / réessayer avec les réglages de l’analyse sélectionnée…')
         self.diarize_button.clicked.connect(self.diarize)
         layout.addWidget(self.diarize_button)
 
@@ -166,11 +179,95 @@ class ProcessingPanel(QWidget):
         if not job:
             self.window.status.setText('Sélectionnez une transcription terminée.')
             return
-        dialog = DiarizationDialog(self)
+        tracks = sorted({row['track'] for row in self.window.store.segments(job)})
+        selected = self.analyses.currentData() or {}
+        dialog = DiarizationDialog(self, initial=json.loads(selected.get('options', '{}')), tracks=tracks)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            python, model, device, speakers = dialog.values()
+            python, model, device, speakers, tuning = dialog.values()
+            from majimeeting.diarization_options import DiarizationOptions
             self.submit('diarize', diarize, self.window.store, job, python, model,
-                        device, speakers, self.cancel, self.progress, cancellable=True)
+                        device, speakers, self.cancel, self.progress,
+                        tuning=DiarizationOptions(**tuning), cancellable=True)
+
+    def open_saved_transcript(self):
+        from majimeeting.transcript_library import TranscriptLibrary
+        dialog = TranscriptLibrary(self.window.store, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.activate_job(dialog.job())
+
+    def activate_job(self, job):
+        with self.window.store.connect() as db:
+            row = db.execute('SELECT meeting_id FROM transcription_jobs WHERE id=?', (job,)).fetchone()
+        if row is None:
+            return False
+        for index in range(self.window.meetings.count()):
+            if self.window.meetings.item(index).data(Qt.ItemDataRole.UserRole) == row['meeting_id']:
+                self.window.meetings.setCurrentRow(index)
+                self.selected()
+                self.reload(preferred_job=job)
+                self.window.centralWidget().setCurrentIndex(1)
+                self.window.status.setText('Transcription sauvegardée ouverte ; aucun calcul relancé.')
+                return True
+        return False
+
+    def restore_selection(self):
+        job = self.settings.value('last_transcription', '')
+        self.activate_job(job)
+
+    def reload_analyses(self, job):
+        from majimeeting.speakers import latest_run, list_runs
+        self.analyses.blockSignals(True)
+        self.analyses.clear()
+        active = ''
+        if job:
+            with self.window.store.connect() as db:
+                active = latest_run(db, job)
+            for row in list_runs(self.window.store, job):
+                title = f"{row['created'][:19]} [{row['status']}]"
+                if row['id'] == active:
+                    title += ' — affichée'
+                self.analyses.addItem(title, row)
+                if row['id'] == active:
+                    self.analyses.setCurrentIndex(self.analyses.count() - 1)
+        self.analyses.blockSignals(False)
+        self.show_analysis()
+
+    def show_analysis(self, *_):
+        row = self.analyses.currentData()
+        self.use_analysis.setEnabled(bool(row and row['status'] == 'completed'))
+        if not row:
+            self.analysis_details.setText('Aucune analyse : la transcription est réutilisable directement.')
+            return
+        options = json.loads(row['options'])
+        seconds = options.get('total_seconds')
+        timing = f'{seconds:.1f} s' if seconds is not None else 'durée non mesurée'
+        details = (f"{row['groups']} groupe(s) au total ; {row['ambiguous']}/{row['segments']} "
+                   f"passages ambigus ; {timing}. Calcul : {options.get('device', '?')}. "
+                   f"Exact : {options.get('speakers', 0)} ; réglages : {options.get('tuning', 'modèle')}. "
+                   'Les corrections individuelles restent prioritaires. ')
+        for track in options.get('tracks', []):
+            effective = track.get('effective', {})
+            devices = effective.get('devices', {})
+            details += (f"\n{track['track']} : {track.get('groups', '?')} groupe(s) ; "
+                        f"réseaux : {devices or 'non mesurés (ancienne analyse)'}. ")
+            if effective.get('gpu'):
+                details += effective['gpu'] + '. '
+            if 'cuda_peak_allocated_mb' in effective:
+                details += f"Pic mémoire Torch : {effective['cuda_peak_allocated_mb']:.0f} Mio. "
+            if effective.get('parameters'):
+                details += f"Paramètres effectifs : {effective['parameters']}. "
+        if row['error']:
+            details += row['error']
+        self.analysis_details.setText(details)
+        self.analysis_details.setToolTip(json.dumps(options, ensure_ascii=False, indent=2))
+
+    def activate_analysis(self):
+        from majimeeting.speakers import select_run
+        row = self.analyses.currentData()
+        if row and row['status'] == 'completed':
+            select_run(self.window.store, self.jobs.currentData(), row['id'])
+            self.show_transcript()
+            self.window.status.setText('Analyse précédente réaffichée ; corrections conservées.')
 
     def device_changed(self, device):
         self.compute.clear()
@@ -184,7 +281,8 @@ class ProcessingPanel(QWidget):
                 widget.setEnabled(device == 'cuda')
 
     def set_busy(self, active):
-        for widget in (self.import_button, self.model, self.browse, self.download, self.device,
+        for widget in (self.open_saved, self.jobs, self.analyses, self.use_analysis,
+                       self.import_button, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
                        self.transcribe_button, self.export_button, self.edit_button, self.diarize_button,
                        self.batched, self.batch_size, self.quality, self.flash, self.workers, self.audio_window):
@@ -224,7 +322,7 @@ class ProcessingPanel(QWidget):
         self.progress_bar.setValue(100 if success else 0)
         self.download_status.setText(self.window.status.text())
 
-    def submit(self, kind, function, *args, cancellable=False):
+    def submit(self, kind, function, *args, cancellable=False, **kwargs):
         self.cancel.clear()
         self.window.busy(True)
         self.window.status.setText('Traitement en cours…')
@@ -234,7 +332,7 @@ class ProcessingPanel(QWidget):
         self.cancel_button.setText('Annuler le téléchargement' if kind == 'download'
                                    else 'Annuler le traitement (après le segment en cours)')
         self.cancel_button.setEnabled(cancellable)
-        self.window.task = (kind, self.window.pool.submit(function, *args))
+        self.window.task = (kind, self.window.pool.submit(function, *args, **kwargs))
 
     def choose_model(self):
         path = QFileDialog.getExistingDirectory(self, 'Modèle faster-whisper local', self.model.text())
@@ -299,7 +397,8 @@ class ProcessingPanel(QWidget):
         self.selection.setText(item.text() if item else 'Sélectionnez une réunion.')
         self.reload()
 
-    def reload(self):
+    def reload(self, preferred_job=None):
+        selected = preferred_job or self.jobs.currentData()
         self.jobs.blockSignals(True)
         self.jobs.clear()
         if self.current_meeting:
@@ -307,11 +406,17 @@ class ProcessingPanel(QWidget):
                 self.jobs.addItem(f"{row['created'][:19]} [{row['status']}] {row['error']}", row['id'])
                 self.jobs.setItemData(self.jobs.count() - 1, row['options'],
                                       Qt.ItemDataRole.UserRole + 1)
+        index = self.jobs.findData(selected)
+        if index >= 0:
+            self.jobs.setCurrentIndex(index)
         self.jobs.blockSignals(False)
         self.show_transcript()
 
     def show_transcript(self):
         job = self.jobs.currentData()
+        if job:
+            self.settings.setValue('last_transcription', job)
+        self.reload_analyses(job)
         options_json = self.jobs.currentData(Qt.ItemDataRole.UserRole + 1)
         details = json.loads(options_json) if options_json else {}
         execution = details.get('execution', {})
