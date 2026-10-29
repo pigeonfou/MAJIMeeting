@@ -1,7 +1,7 @@
 [Setup]
 AppId=MAJIMeeting
 AppName=MAJIMeeting
-AppVersion=0.2.7
+AppVersion=0.2.8
 AppPublisher=MAJIMeeting
 DefaultDirName={localappdata}\Programs\MAJIMeeting
 DefaultGroupName=MAJIMeeting
@@ -9,7 +9,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=MAJIMeeting-0.2.7-preview-Setup
+OutputBaseFilename=MAJIMeeting-0.2.8-preview-Setup
 Compression=lzma2
 SolidCompression=yes
 UninstallDisplayIcon={app}\MAJIMeeting.exe
@@ -18,6 +18,8 @@ UninstallDisplayIcon={app}\MAJIMeeting.exe
 Source: "..\dist\MAJIMeeting\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 Source: "..\scripts\setup-diarization.ps1"; DestDir: "{app}"; Flags: ignoreversion
+
+Source: "..\scripts\setup_diarization_runtime.py"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\MAJIMeeting"; Filename: "{app}\MAJIMeeting.exe"

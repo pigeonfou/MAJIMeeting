@@ -102,7 +102,12 @@ jobs:
           cache-dependency-path: scripts/setup-diarization.ps1
       - name: Install and import the isolated CPU diarization runtime
         shell: pwsh
-        run: ./scripts/setup-diarization.ps1 -Device cpu -RuntimeRoot "$env:RUNNER_TEMP/diarization-runtime" -SkipModel
+        run: |
+          python -m pip install requests
+          if ($LASTEXITCODE -ne 0) { throw 'Requests installation failed' }
+          $env:PYTHONPATH = 'src'
+          python -c "import os; from pathlib import Path; from majimeeting.diarization_setup import install_dependencies; install_dependencies('cpu', progress=lambda message, percent=None: print(message, flush=True), runtime_root=Path(os.environ['RUNNER_TEMP']) / 'diarization-runtime')"
+          if ($LASTEXITCODE -ne 0) { throw 'GUI dependency backend failed' }
   windows-package:
     needs: [plan, test, diarization-runtime]
     if: always() && needs.plan.result == 'success' && needs.plan.outputs.reuse != 'true' && needs.test.result == 'success' && needs.diarization-runtime.result == 'success'
@@ -138,8 +143,9 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-installed'
-          $setup = Start-Process dist/MAJIMeeting-0.2.7-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          $setup = Start-Process dist/MAJIMeeting-0.2.8-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installation failed: $($setup.ExitCode)" }
+          if (-not (Test-Path "$target/setup_diarization_runtime.py")) { throw "Missing runtime helper" }
           if (-not (Test-Path "$target/setup-diarization.ps1")) { throw "Missing runtime setup script" }
           $app = Start-Process "$target/MAJIMeeting.exe" -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(30000)) { $app.Kill(); throw 'Installed app timeout' }
@@ -178,7 +184,7 @@ jobs:
         with:
           name: MAJIMeeting-Windows-preview
           path: |
-            dist/MAJIMeeting-0.2.7-preview-Setup.exe
+            dist/MAJIMeeting-0.2.8-preview-Setup.exe
             dist/build-manifest.json
           if-no-files-found: error
           overwrite: true

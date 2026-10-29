@@ -12,14 +12,26 @@ le moteur Whisper existant et libérer la VRAM à la fin de chaque processus d'a
 2. Avec votre compte Hugging Face, accepter les conditions du modèle
    https://huggingface.co/pyannote/speaker-diarization-community-1 et créer un jeton de lecture.
    Aucun accès au compte n'est demandé à ChatGPT. L'acceptation reste personnelle.
-3. Lancer le raccourci du menu Démarrer **Préparer la diarisation locale**. Le script
-   `setup-diarization.ps1` crée un environnement utilisateur, installe PyTorch 2.8.0 CUDA 12.8,
-   torchaudio 2.8.0, torchcodec 0.7.0 et pyannote.audio 4.0.7, puis demande le jeton sans
-   l'afficher ni le sauvegarder et télécharge le modèle. Plusieurs Go sont nécessaires.
-   Il teste ensuite le chargement local en mode Hub hors ligne.
-   Pour une machine sans GPU, le script accepte `-Device cpu`.
-4. Chemins par défaut : `%LOCALAPPDATA%\MAJIMeeting\runtime\Scripts\python.exe` et
-   `%LOCALAPPDATA%\MAJIMeeting\models\community-1`.
+3. Dans **Distinguer automatiquement les interlocuteurs**, choisir CPU ou CUDA puis
+   cliquer **Télécharger et installer les dépendances**. La progression et les messages
+   d'installation sont affichés dans cette fenêtre. Le modèle n'est pas retéléchargé.
+   L'installation s'effectue dans le runtime utilisateur géré ; son Python est sélectionné
+   automatiquement après réussite. Python 3.11 x64 avec le lanceur `py` reste un prérequis.
+4. Cliquer **Télécharger le modèle Community-1** et saisir le jeton dans le champ masqué.
+   Le téléchargement est indépendant du runtime, reprend les transferts partiels et
+   vérifie les fichiers par taille/empreinte à une révision fixe du dépôt. Le jeton n'est
+   enregistré ni en paramètres ni en journal. Les erreurs 401/403 indiquent de vérifier
+   les conditions d'accès et le jeton. Les fichiers déjà présents et vérifiés sont réutilisés.
+5. Chemins par défaut : `%LOCALAPPDATA%\MAJIMeeting\runtime\Scripts\python.exe` et
+   `%LOCALAPPDATA%\MAJIMeeting\models\community-1`. Un modèle téléchargé manuellement
+   peut toujours être sélectionné sans utiliser le bouton de téléchargement.
+
+Pendant une préparation, les chemins et le lancement de l'analyse sont désactivés.
+Le bouton d'annulation interrompt l'installation et ses processus enfants ; le téléchargement
+peut attendre la fin de la requête réseau en cours (délais de connexion/lecture bornés).
+Fermer la fenêtre demande l'arrêt avant fermeture. Une annulation conserve les téléchargements
+partiels pour reprise ; relancer l'installation répare le runtime incomplet.
+Le raccourci historique du menu Démarrer et le script restent disponibles en alternative.
 
 Ce runtime utilisateur et les modèles persistent après mise à jour ou désinstallation
 pour éviter de perdre les données. Ils peuvent être supprimés manuellement si inutiles.

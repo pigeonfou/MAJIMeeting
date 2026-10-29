@@ -522,3 +522,18 @@ stable restent à réaliser.
 - Job diarization-runtime Windows réussi : installation réelle torch2.8.0+cpu/torchaudio2.8.0+cpu/torchcodec0.7.0/pyannote.audio4.0.7 et import Pipeline réussi. Aucun poids Community-1 utilisé ; CUDA absent sur le runner, ce qui est attendu.
 - [Run main 40843827434](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40843827434) réussi, [v0.2.7-preview.46](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.7-preview.46) publiée.
 - Prochaine validation utilisateur : installer0.2.7, préparer runtime/modèle via le raccourci fourni après acceptation HF, puis diarisation réelle CUDA/hors ligne d'une réunion à plusieurs voix ; consulter docs/DIARIZATION.md. Le jalon3 n'est pas déclaré terminé avant cet essai.
+
+
+## Préparation intégrée de la diarisation 0.2.8
+
+- Demande utilisateur après erreur NumPy manquant : deux boutons indépendants dans la configuration de diarisation, installation des dépendances et téléchargement de Community-1.
+- Installation en arrière-plan du runtime géré, CPU ou CUDA selon le choix ; sélection automatique de son Python après validation. Aucune installation dans le Python externe sélectionné par erreur. Python3.11 x64 avec lanceur py reste requis.
+- Téléchargement du modèle par HTTP borné/reprenable avec révision fixe, taille et SHA vérifiés, arborescence conservée, fichiers déjà vérifiés réutilisés. Jeton de lecture masqué, transmis en mémoire uniquement, sans stockage ni ligne de commande ; erreurs401/403 explicites.
+- Progression/journal visible, chemins et lancement verrouillés pendant préparation, annulation du transfert ou de l'installation et de ses processus enfants, fermeture différée jusqu'à arrêt. Le téléchargement du modèle ne dépend pas du runtime.
+- Script corrigé : sélection explicite des variantes torch/torchaudio CPU ou cu128 pour ne pas conserver par erreur une installation CPU lors du passage CUDA ; CUDA vérifié si demandé.
+- Tests locaux : 108 tests normaux réussis, Ruff réussi ; smoke Qt éditeur/lecture réussi. Tests nouveaux : empreintes/arborescence/reprise Community-1, secrets absents des fichiers, refus gated, arguments d'installation, sortie/annulation processus, boutons asynchrones/chemins/fermeture.
+- À vérifier : CI Windows/Linux, appel réel du même backend d'installation CPU sur Windows, installateur0.2.8. Téléchargement réel gated et exécution Community-1 CUDA sur PC utilisateur restent à réaliser.
+
+
+- Première CI 40859979027 : tests Windows/Linux réussis ; échec du contrôle runtime sous Windows PowerShell 5, `SyntaxError: '(' was never closed` après troncature de la commande Python `-c`. Même problème confirmé sur la capture utilisateur0.2.7. Aucun installateur0.2.8 publié à ce stade.
+- Correction : vérifications/téléchargement historique/validation déplacés dans un fichier Python auxiliaire livré avec le script ; plus de code Python passé dans les guillemets de PowerShell5. CI relancée sur le même backend utilisé par le bouton.
