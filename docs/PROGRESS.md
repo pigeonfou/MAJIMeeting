@@ -1,13 +1,15 @@
 # Progression MAJIMeeting
 
-Mise à jour : 28 octobre 2026.
+Mise à jour : 29 octobre 2026.
 
 ## État global
 Jalon 2 : vitesse et résultats de transcription validés par l'utilisateur sur la réunion
 testée avec la configuration GPU de référence ci-dessous. Validation stable et essais
 matériels reportés toujours à réaliser.
 Première partie du jalon 3 (éditeur, noms manuels, historique et réécoute) validée
-par retour utilisateur sur la version 0.2.4. Diarisation automatique à réaliser.
+par retour utilisateur sur la version 0.2.4. Diarisation Community-1 intégrée en préversion,
+avec réglages et historique en 0.2.10. Premiers essais utilisateur : regroupements de voix
+à améliorer ; qualité, performances et diagnostic CUDA sur réunions représentatives à valider.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
 conservés à réaliser. Aucune release stable validée.
 Le socle initial au commit `32caf8a` a été intégralement relu (neuf fichiers).
@@ -578,3 +580,11 @@ stable restent à réaliser.
 - À réaliser : validation finale locale et CI, puis essai réel sur PC utilisateur, qualité des voix et impact des paramètres sur réunions représentatives. Aucun gain de qualité ou de vitesse GPU déclaré à ce stade.
 
 - Validation locale : suite complète 132 tests réussis, puis 18 tests ciblés réussis après ajout du cas réseau laissé sur CPU ; Ruff et contrôle Qt éditeur/lecture réussis. Les contrôles utilisent des doublures pour Community-1 et ne constituent pas une validation du modèle/GPU réel.
+
+### Validation et publication 0.2.10
+
+- [PR nº 14](https://github.com/pigeonfou/MAJIMeeting/pull/14) fusionnée dans `5e3b5af7341603168025d2343276aa8c81511477`, source finale `26b3b71eaa3357e88e35e2a5165ff9b45b23fa79` (messages du runtime forcés en UTF-8 sous Windows).
+- [CI 40891736379](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40891736379) réussie : 133 tests Windows et 133 tests Linux, Ruff, contrôles Qt/nouveaux écrans/lecture et transcription CPU réelle hors ligne. Runtime pyannote CPU installé et importé.
+- EXE et installateur construits ; contrôles démarrage, réglages Community-1, catalogue de transcriptions, éditeur/lecture et Whisper CPU réel de l'application installée réussis.
+- [Publication 40893292408](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40893292408) réussie ; [v0.2.10-preview.54](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.10-preview.54) disponible. Installateur : `sha256:bb30973836d8d2dd09033dbe2f3302ed1e2ee916c8816d39ce14b0de15ef71f1`.
+- À réaliser sur le PC utilisateur : sélectionner CUDA dans le dialogue propre à la diarisation, vérifier les périphériques affichés, comparer nombre de voix/seuils sur la même transcription sans relancer Whisper, vérifier les passages problématiques et le retour à une analyse antérieure. Les doublures de tests et runners CPU ne valident pas l'inférence Community-1 sur RTX.
