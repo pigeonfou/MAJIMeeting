@@ -54,7 +54,7 @@ Aucun modèle IA n’est chargé pour éditer ou lire.
 ## Transcription par lots et mesures
 
 Le worker peut encapsuler WhisperModel dans BatchedInferencePipeline sans charger un
-second modèle. La fenêtre audio disque reste bornée à cinq minutes. Un seul modèle est conservé par reprise. La préversion 0.2.6 peut utiliser
+second modèle. Les fenêtres audio disque sont réglables de cinq à trente minutes. Un seul modèle est conservé par reprise. La préversion 0.2.6 peut utiliser
 deux pipelines indépendants avec deux workers natifs partageant ce modèle. Un manque explicite de VRAM réduit les
 lots avant essai du chemin CUDA séquentiel puis éventuel CPU ; les références des
 itérateurs/pipelines sont libérées avant la reprise hors du gestionnaire d’exception.
@@ -70,3 +70,23 @@ précèdent toute suppression des temporaires ou reprise. Les erreurs mémoire r
 d’abord la concurrence ; une incompatibilité Flash explicite réessaie CUDA sans Flash.
 Le forward natif mesure les tailles effectivement soumises, sans modifier les features.
 Les temps des workers sont cumulés et distingués de la durée totale dans l’interface.
+
+
+## Diarisation locale 0.2.7 (validation matérielle à réaliser)
+
+`diarization.py` prépare en streaming une piste mono 16 kHz avec silences aux trous et
+origine absolue conservée. Un Python isolé charge Community-1 sur CPU/CUDA après Whisper ;
+son processus est attendu/arrêté avant nettoyage, annulation ou retour au worker série.
+Les modèles Torch ne résident pas dans le processus Qt/CTranslate2. Le réseau du processus
+est bloqué et les télémétries désactivées. Limite initiale explicite : quatre heures par piste.
+
+`speakers.py` conserve analyses, tours réguliers incluant chevauchements, attributions
+prudentes aux segments et révisions de noms de groupe. Seule la dernière analyse réussie
+est affichée ; aucun résultat partiel ne remplace une analyse existante. Les éditions
+manuelles de segment, même un nom vide, restent prioritaires. Les groupes sont distincts
+par piste et par analyse. Aucun rapprochement certain de personne entre pistes.
+
+Le script utilisateur livré prépare les dépendances et les poids soumis à acceptation HF.
+La CI installe et importe le runtime CPU Windows, mais ne possède pas les poids gated :
+validation du modèle réel et mesures GPU/hors ligne restent des contrôles matériels requis.
+Voir docs/DIARIZATION.md.

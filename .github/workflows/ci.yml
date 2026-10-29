@@ -88,9 +88,24 @@ jobs:
         env:
           HF_HUB_OFFLINE: '1'
         run: python -m majimeeting --inference-smoke test-model
+  diarization-runtime:
+    needs: plan
+    if: needs.plan.outputs.reuse != 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: scripts/setup-diarization.ps1
+      - name: Install and import the isolated CPU diarization runtime
+        shell: pwsh
+        run: ./scripts/setup-diarization.ps1 -Device cpu -RuntimeRoot "$env:RUNNER_TEMP/diarization-runtime" -SkipModel
   windows-package:
-    needs: [plan, test]
-    if: always() && needs.plan.result == 'success' && needs.plan.outputs.reuse != 'true' && needs.test.result == 'success'
+    needs: [plan, test, diarization-runtime]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.reuse != 'true' && needs.test.result == 'success' && needs.diarization-runtime.result == 'success'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -123,8 +138,9 @@ jobs:
         shell: pwsh
         run: |
           $target = Join-Path $env:RUNNER_TEMP 'MAJIMeeting-installed'
-          $setup = Start-Process dist/MAJIMeeting-0.2.6-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
+          $setup = Start-Process dist/MAJIMeeting-0.2.7-preview-Setup.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$target") -PassThru -Wait
           if ($setup.ExitCode -ne 0) { throw "Installation failed: $($setup.ExitCode)" }
+          if (-not (Test-Path "$target/setup-diarization.ps1")) { throw "Missing runtime setup script" }
           $app = Start-Process "$target/MAJIMeeting.exe" -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(30000)) { $app.Kill(); throw 'Installed app timeout' }
           if ($app.ExitCode -ne 0) { throw "Installed app failed: $($app.ExitCode)" }
@@ -162,7 +178,7 @@ jobs:
         with:
           name: MAJIMeeting-Windows-preview
           path: |
-            dist/MAJIMeeting-0.2.6-preview-Setup.exe
+            dist/MAJIMeeting-0.2.7-preview-Setup.exe
             dist/build-manifest.json
           if-no-files-found: error
           overwrite: true

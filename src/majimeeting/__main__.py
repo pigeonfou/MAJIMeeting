@@ -171,6 +171,9 @@ class MainWindow(QMainWindow):
                     self.status.setText(
                         f'Transcription terminée avec {warnings} avertissement(s) d’horodatage à vérifier.'
                         if warnings else 'Transcription terminée ; consultez le mode de calcul dans l’historique.')
+                elif kind == 'diarize':
+                    self.status.setText('Interlocuteurs analysés. Ouvrez l’éditeur pour nommer les groupes '
+                                        'et vérifier les passages ambigus.')
                 elif kind == 'download':
                     self.status.setText('Modèle installé. La transcription fonctionne hors ligne.')
                 else:
