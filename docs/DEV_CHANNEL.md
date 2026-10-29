@@ -26,7 +26,7 @@ Par défaut, `%LOCALAPPDATA%\MAJIMeeting-DEV` contient :
 | `launcher.py` | Lanceur stable suivi par les raccourcis |
 | `state.json` | Commit, environnement et catalogue actifs ; version précédente |
 | `versions/<commit>` | Code vérifié d'une révision exacte |
-| `runtimes/<empreinte>` | Environnement Python permanent associé aux dépendances figées |
+| `runtimes/<préfixe16de-l’empreinte>` | Environnement Python permanent associé aux dépendances figées |
 | `data` | Catalogue DEV initial vide |
 | `datasets/copie-<identifiant>` | Copies indépendantes des réunions habituelles |
 | `logs` et `dev-errors.log` | Journaux de lancement et d'erreurs |
