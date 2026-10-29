@@ -174,7 +174,7 @@ def verify_source(source, manifest):
 
 
 def runtime_python(root, runtime):
-    return root / 'runtimes' / runtime / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+    return root / 'runtimes' / runtime[:16] / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
 
 
 def child_environment(root, state, commit):
@@ -190,12 +190,16 @@ def prepare_runtime(root, manifest, source):
     runtime = manifest['runtime']
     python = runtime_python(root, runtime)
     ready = python.parent.parent / 'runtime-ready.json'
-    if ready.exists() and json.loads(ready.read_text()) == {'runtime': runtime}:
+    if ready.exists():
+        if json.loads(ready.read_text()) != {'runtime': runtime}:
+            raise ValueError('Collision de dossier de dépendances ; environnement existant conservé.')
         return
     print('Préparation initiale des dépendances (réutilisées aux mises à jour suivantes)…', flush=True)
     env = os.environ.copy()
     env.pop('PYTHONHOME', None)
     env.pop('PYTHONPATH', None)
+    for key in ('PIP_TARGET', 'PIP_PREFIX', 'PIP_USER'):
+        env.pop(key, None)
     if not python.is_file():
         subprocess.run([sys.executable, '-I', '-m', 'venv', str(python.parent.parent)], check=True, env=env)
     pins = python.parent.parent / 'requirements.txt'

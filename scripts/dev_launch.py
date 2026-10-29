@@ -12,7 +12,7 @@ def main():
     current = state['current']
     source = root / 'versions' / current['commit']
     name = 'pythonw.exe' if sys.argv[1:] == ['run'] else 'python.exe'
-    python = root / 'runtimes' / current['runtime'] / ('Scripts/' + name)
+    python = root / 'runtimes' / current['runtime'][:16] / ('Scripts/' + name)
     if not python.is_file():
         python = python.with_name('python.exe')
     env = os.environ.copy()

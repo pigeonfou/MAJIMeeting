@@ -82,7 +82,7 @@ jobs:
           py -3.11 -X utf8 "$root/launcher.py" run --smoke
           if ($LASTEXITCODE -ne 0) { throw 'DEV launcher failed' }
           $state = Get-Content "$root/state.json" -Raw | ConvertFrom-Json
-          $python = Join-Path $root ("runtimes/" + $state.current.runtime + "/Scripts/python.exe")
+          $python = Join-Path $root ("runtimes/" + $state.current.runtime.Substring(0,16) + "/Scripts/python.exe")
           $entry = Join-Path $root ("versions/" + $state.current.commit + "/scripts/run_source.py")
           $env:MAJIMEETING_CHANNEL = 'dev'
           & $python -I -X utf8 $entry --editor-smoke
