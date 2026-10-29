@@ -8,7 +8,7 @@ testée avec la configuration GPU de référence ci-dessous. Validation stable e
 matériels reportés toujours à réaliser.
 Première partie du jalon 3 (éditeur, noms manuels, historique et réécoute) validée
 par retour utilisateur sur la version 0.2.4. Diarisation Community-1 intégrée en préversion,
-avec réglages et historique en 0.2.10. Premiers essais utilisateur : regroupements de voix
+avec réglages et historique en 0.2.10, puis découpage lexical et nomination par extraits en 0.2.11. Premiers essais utilisateur : regroupements de voix
 à améliorer ; qualité, performances et diagnostic CUDA sur réunions représentatives à valider.
 Jalon 1 : socle fonctionnel validé partiellement sur le PC utilisateur ; essais complémentaires
 conservés à réaliser. Aucune release stable validée.
@@ -599,3 +599,11 @@ stable restent à réaliser.
 - SQLite additive : mots, passages par analyse et corrections historisées. Anciennes corrections de segment prioritaires. Corrections de passages réutilisées seulement si mêmes bornes/texte source ; sinon restent dans l'analyse d'origine. Export JSON enrichi pour l'audit.
 - Tests locaux :144tests réussis, puis20ciblés après ajout de la vérification de conservation des mots en mode lots ; Ruff réussi. Contrôle Qt éditeur/lecture/nouvelle nomination réussi. API réelle d'alignement faster-whisperCPU et contrôles complets de transcription réelle hors ligne réussis avec le modèle tiny ; silence synthétique, aucune validation de qualité sur réunion.
 - À réaliser : CIWindows/Linux, application installée et publication ; validation réelle sur la réunion utilisateur, qualité des changements de voix et quantité de revue restante. L'horodatage mot à mot a un coût de calcul ; performances à mesurer. Pas de garantie d'identifier correctement toutes les paroles simultanées.
+
+### Validation et publication du parcours0.2.11
+
+- [PR nº15](https://github.com/pigeonfou/MAJIMeeting/pull/15) fusionnée dans `79140fee9d34fbaf3e630f09026fa93b55a3a886`, source `5eebbeddbeeb80c1433ba3dcc15765bd7acc6b74`.
+- [CI 40903686145](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40903686145) réussie :144tests Windows et144tests Linux, Ruff, contrôles Qt/lecture/nouvelle nomination, transcriptionCPU réelle hors ligne et API d'alignement réelle sur silence synthétique. Runtime pyannoteCPU installé/importé.
+- EXE et installateur construits et installés ; démarrage, découpage synthétique en deux voix, nomination par extraits, lecture et inférence/alignementCPU réel de la version installée réussis. Ces contrôles ne qualifient pas la précision sur une réunion réelle ni l'alignement CUDA.
+- [Publication 40905038950](https://github.com/pigeonfou/MAJIMeeting/actions/runs/40905038950) réussie ; [v0.2.11-preview.56](https://github.com/pigeonfou/MAJIMeeting/releases/tag/v0.2.11-preview.56) disponible. SHA-256 installateur : `sha256:d809a757491721f24ae37f9b54d5d2cfc4896ba8e24d5f7cbc25a18ea4a7093d`.
+- Prochaine validation utilisateur : rouvrir la transcription existante, vérifier le modèle Whisper local, relancer seulement la diarisation pour aligner les anciens segments ambigus, nommer les quelques groupes par extraits et mesurer la revue restante. Pour une nouvelle réunion : bouton Transcrire et proposer les intervenants. Comparer les mêmes changements de voix et véritables superpositions ; ne pas conclure à une meilleure qualité uniquement à partir du nombre d'ambiguïtés.
