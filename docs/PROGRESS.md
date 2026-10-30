@@ -648,8 +648,30 @@ stable restent à réaliser.
 - Tests locaux : 155 tests existants réussis après la première réorganisation ;
   9 tests ciblés interface/navigation réussis après ajout de quatre scénarios.
   Vérification visuelle Qt hors écran en clair et sombre (1280×820 et 1000×700).
-  Suite finale locale : 159 tests réussis et Ruff réussi. CI Windows/Linux et publication DEV : en cours.
+  Suite finale locale : 159 tests réussis et Ruff réussi. CI et publication validées ci-dessous.
 - À réaliser sur le PC utilisateur : validation ergonomique Windows, mise à jour DEV,
   capture WASAPI et traitement CUDA avec la nouvelle disposition.
 - Jalons fonctionnels inchangés : le prétraitement / réordonnancement du pipeline
   et les comptes rendus LLM restent à développer ; essais matériels reportés conservés.
+
+### Validation et publication de l’interface
+
+- [PR nº17](https://github.com/pigeonfou/MAJIMeeting/pull/17) fusionnée ; source finale
+  `ecce386af77b8ef5e2f1554e460f4047faf43a8f`, fusion `3c9e402a44d1ee3e851237adb3d205eea5ce6fcd`.
+- [CI PR 41077728671](https://github.com/pigeonfou/MAJIMeeting/actions/runs/41077728671)
+  et [publication main 41078280709](https://github.com/pigeonfou/MAJIMeeting/actions/runs/41078280709)
+  réussies : 159 tests Windows et 159 tests Linux, Ruff, cohérence des dépendances,
+  démarrage Qt, corrections/lecture WAV et inférence/alignement CPU réels hors ligne.
+- Le scénario de rafraîchissement vérifie aussi la conservation d’une ancienne
+  transcription sélectionnée lorsqu’une tentative plus récente existe.
+- [Version DEV publiée](https://github.com/pigeonfou/MAJIMeeting/releases/tag/dev-3c9e402a44d1ee3e851237adb3d205eea5ce6fcd).
+  Paquet source : 175022 octets ; empreinte SHA-256
+  `9ca12edb2c6e696472b1c088950c9b50b783f9ab18d49c1ee570cbc6d5bac540`.
+- Téléchargement réel de la release publique par le gestionnaire : manifeste,
+  archive, extraction et empreintes de tous les fichiers validés ; nouveau module
+  `workspace_ui.py` présent. Aucun déploiement distant sur le PC utilisateur.
+- Dépendances et format des données inchangés ; mise à jour par le raccourci
+  **Mettre a jour et lancer MAJIMeeting DEV**, application fermée. Distribution DEV.
+- À réaliser sur le PC utilisateur : validation ergonomique, raccourcis Windows,
+  réouverture des réunions, capture WASAPI et traitement CUDA depuis cette interface.
+  Les essais matériels reportés et jalons IA/documentaires restent à réaliser.
