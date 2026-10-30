@@ -35,12 +35,16 @@ def test_saved_transcript_opens_reading_area_and_reveals_filtered_meeting(tmp_pa
 
 def test_library_search_and_refresh_preserve_selected_meeting(tmp_path):
     window, meeting = populated(tmp_path)
+    window.store.start_transcription('newer', meeting, TranscriptionOptions('local'))
+    window.store.add_segment('newer', 'track-01', 1, 3, 'Autre tentative.')
+    window.store.finish_transcription('newer', 'completed')
     window.processing.activate_job('saved')
     window.meeting_search.setText('ACOUSTIQUE')
     window.reload_meetings()
     assert window.meetings.currentItem().data(Qt.ItemDataRole.UserRole) == meeting
     visible = [window.meetings.item(i) for i in range(window.meetings.count())
                if not window.meetings.item(i).isHidden()]
+    assert window.processing.jobs.currentData() == 'saved'
     assert len(visible) == 1
     assert visible[0] is window.meetings.currentItem()
     window.close()

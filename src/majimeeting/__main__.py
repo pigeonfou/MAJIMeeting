@@ -131,6 +131,7 @@ class MainWindow(QMainWindow):
     def reload_meetings(self):
         selected = self.meetings.currentItem()
         selected_id = selected.data(Qt.ItemDataRole.UserRole) if selected else None
+        selected_job = self.processing.jobs.currentData()
         self.meetings.clear()
         for row in self.store.list():
             item = QListWidgetItem(f"{row['title']}\n{row['created'][:19]} · {row['status']}")
@@ -140,6 +141,8 @@ class MainWindow(QMainWindow):
             if row["id"] == selected_id:
                 self.meetings.setCurrentItem(item)
         self.filter_meetings(self.meeting_search.text())
+        if self.meetings.currentItem() and selected_job:
+            self.processing.reload(preferred_job=selected_job)
 
     def start_recording(self):
         selected = [self.devices.item(i).data(Qt.ItemDataRole.UserRole)
@@ -182,6 +185,7 @@ class MainWindow(QMainWindow):
                         self.devices.addItem(item)
                     self.status.setText("Sélectionnez vos sources audio.")
                 elif kind == 'import':
+                    self.meeting_search.clear()
                     self.reload_meetings()
                     for i in range(self.meetings.count()):
                         if self.meetings.item(i).data(Qt.ItemDataRole.UserRole) == result:

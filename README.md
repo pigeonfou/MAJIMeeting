@@ -37,19 +37,21 @@ exportables. Les données sont dans `%LOCALAPPDATA%\MAJIMeeting\data`.
 
 La CI construit un installateur Windows de préversion et vérifie son installation et son
 démarrage. Il est fourni comme artefact de workflow ; cela ne valide pas les périphériques
-physiques. Les modèles sont téléchargés séparément depuis l'onglet de transcription. L'application fonctionne localement.
+physiques. Les modèles sont téléchargés séparément depuis Paramètres. L'application fonctionne localement.
 
 Voir [la progression](docs/PROGRESS.md) et [les essais Windows](docs/WINDOWS_TESTS.md).
 
 ## Transcription locale (jalon 2)
-L'onglet **Import et transcription** permet d'importer un WAV/MP3/FLAC/M4A ou de transcrire
-une réunion enregistrée. Choisir un modèle local faster-whisper (ou télécharger large-v3
-avec le bouton dédié), puis CPU/int8 ou CUDA si les bibliothèques NVIDIA sont installées.
+La colonne **Mes réunions** permet d’importer un WAV/MP3/FLAC/M4A ou d’ouvrir une réunion
+enregistrée. Dans **Paramètres**, choisir un modèle faster-whisper local (ou télécharger
+large-v3), puis CPU/int8 ou CUDA si les bibliothèques NVIDIA sont installées. Lancer le
+traitement depuis **Transcription et intervenants**.
 La transcription française est horodatée, persistante, consultable et exportable TXT/JSON.
 Voir [le guide de transcription](docs/TRANSCRIPTION.md) pour les essais et limites.
 
 La préversion 0.2.4 ajoute [les corrections et la réécoute](docs/EDITOR.md), avec
-attribution manuelle des noms et historique. La diarisation automatique reste à intégrer.
+attribution manuelle des noms et historique. La diarisation automatique Community-1 est disponible en préversion, avec réglages,
+historique et nomination par courts extraits ; sa qualité reste à valider sur les réunions réelles.
 
 La préversion 0.2.5 ajoute le [traitement par lots GPU et les mesures de vitesse](docs/PERFORMANCE.md).
 Les profils Qualité/Rapide et le chemin séquentiel sont proposés pour comparer la même réunion.
@@ -64,3 +66,12 @@ Ces options expérimentales sont à comparer séparément sur le PC utilisateur.
 Pour les essais fréquents, le canal DEV exécute les sources dans un environnement Python permanent. Il dispose de données et réglages séparés, de mises à jour vérifiées et d'un retour à la version précédente. Aucun Git ni terminal nécessaire après l'installation initiale. Les modèles locaux existants sont réutilisables.
 
 Télécharger `MAJIMeeting-DEV-Setup.zip` dans une release **MAJIMeeting DEV**, extraire puis lancer `Installer-DEV.cmd`. Voir [Installation et fonctionnement du canal DEV](docs/DEV_CHANNEL.md). Les installateurs classiques restent disponibles pour les versions de distribution.
+
+
+## Interface organisée par tâche
+
+**Mes réunions** reste visible à gauche, avec recherche et réouverture sans recalcul.
+Trois espaces : **Enregistrer**, **Transcription et intervenants**, **Paramètres**.
+Les résultats sont répartis en **Texte**, **Intervenants** et **Diagnostic** ; progression
+et annulation restent visibles partout. Voir [le guide de l’interface](docs/INTERFACE.md).
+Les changements d’interface sont distribués par le canal DEV.
