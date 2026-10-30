@@ -15,10 +15,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QScrollArea,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
 )
 
 from majimeeting.capture import RecordingSession, WasapiBackend
@@ -41,48 +37,44 @@ class MainWindow(QMainWindow):
         self.store = store
         self.session = None
         self.task = None
+        self._ui_busy = False
         self.pool = ThreadPoolExecutor(max_workers=1)
         self.setWindowTitle(window_title())
-        self.resize(1000, 700)
-        body = QWidget()
-        layout = QVBoxLayout(body)
+        self.resize(1280, 820)
+        from majimeeting.workspace_ui import build_workspace, page, row, section
+        body, layout = page('Enregistrer une réunion',
+                            'Donnez un titre, cochez les sources audio puis démarrez la capture. '
+                            'Pour Teams ou Zoom, choisissez la sortie Audio système utilisée par l’appel.')
         self.title = QLineEdit()
-        self.title.setPlaceholderText("Titre de la réunion")
-        layout.addWidget(self.title)
-        layout.addWidget(QLabel("Sources WASAPI (plusieurs sélections possibles)"))
+        self.title.setPlaceholderText('Titre de la réunion')
+        self.title.setAccessibleName('Titre de la réunion')
+        section(layout, 'Réunion', [('Titre', self.title)])
         self.devices = QListWidget()
-        layout.addWidget(self.devices)
-        self.refresh = QPushButton("Actualiser les sources")
+        self.devices.setAccessibleName('Sources audio à enregistrer')
+        layout.addWidget(QLabel('Sources audio — cochez un microphone et/ou une sortie Audio système'))
+        layout.addWidget(self.devices, 1)
+        self.refresh = QPushButton('Actualiser les sources')
         self.refresh.clicked.connect(self.load_devices)
-        layout.addWidget(self.refresh)
-        self.start_button = QPushButton("Démarrer l'enregistrement")
+        row(layout, self.refresh)
+        self.start_button = QPushButton('Démarrer l’enregistrement')
         self.start_button.clicked.connect(self.start_recording)
-        layout.addWidget(self.start_button)
-        self.stop_button = QPushButton("Arrêter et sauvegarder")
+        self.stop_button = QPushButton('Arrêter et sauvegarder')
         self.stop_button.clicked.connect(self.stop_recording)
         self.stop_button.setEnabled(False)
-        layout.addWidget(self.stop_button)
-        self.status = QLabel("Prêt")
+        row(layout, self.start_button, self.stop_button)
+        self.status = QLabel('Prêt')
         self.status.setWordWrap(True)
         self.statusBar().addWidget(self.status, 1)
-        self.dark = QCheckBox("Thème sombre")
+        self.dark = QCheckBox('Thème sombre')
         self.dark.toggled.connect(self.set_theme)
-        layout.addWidget(self.dark)
-        layout.addWidget(QLabel("Réunions locales — sélectionnez une réunion pour exporter une piste"))
         self.meetings = QListWidget()
-        layout.addWidget(self.meetings)
-        self.export_button = QPushButton("Exporter une piste en WAV…")
+        self.meetings.setAccessibleName('Mes réunions')
+        self.export_button = QPushButton('Exporter une piste WAV…')
         self.export_button.clicked.connect(self.export)
-        layout.addWidget(self.export_button)
-        tabs = QTabWidget()
-        tabs.addTab(body, 'Enregistrement et réunions')
         self.processing = ProcessingPanel(self)
-        processing_scroll = QScrollArea()
-        processing_scroll.setWidgetResizable(True)
-        processing_scroll.setWidget(self.processing)
-        tabs.addTab(processing_scroll, 'Import et transcription')
+        build_workspace(self, body)
+        self.dark.setChecked(self.processing.settings.value('dark_theme', False, type=bool))
         self.meetings.currentItemChanged.connect(self.processing.selected)
-        self.setCentralWidget(tabs)
         recovered = self.store.recover()
         self.reload_meetings()
         self.processing.restore_selection()
@@ -95,6 +87,8 @@ class MainWindow(QMainWindow):
             self.load_devices()
 
     def set_theme(self, dark):
+        if hasattr(self, "processing"):
+            self.processing.settings.setValue("dark_theme", dark)
         self.setStyleSheet(
             "QWidget { background: #202530; color: #edf1f7; } "
             "QLineEdit, QListWidget { background: #141922; } "
@@ -102,11 +96,32 @@ class MainWindow(QMainWindow):
             "QPushButton:disabled { color: #9298a1; }" if dark else ""
         )
 
+    def filter_meetings(self, text):
+        query = text.casefold().strip()
+        for index in range(self.meetings.count()):
+            item = self.meetings.item(index)
+            item.setHidden(query not in item.text().casefold())
+
+    def sync_commands(self):
+        idle = not self._ui_busy
+        selected = self.meetings.currentItem() is not None
+        job = self.processing.jobs.currentData() is not None
+        self.export_button.setEnabled(idle and selected)
+        for button in (self.processing.full_analysis, self.processing.transcribe_button):
+            button.setEnabled(idle and selected)
+        for button in (self.processing.edit_button, self.processing.speaker_button,
+                       self.processing.diarize_button, self.processing.export_button):
+            button.setEnabled(idle and job)
+        for action, button in getattr(self, 'command_actions', []):
+            action.setEnabled(button.isEnabled())
+
     def busy(self, active):
+        self._ui_busy = active
         self.processing.set_busy(active)
         for widget in (self.title, self.devices, self.refresh, self.start_button,
                        self.export_button, self.meetings):
             widget.setEnabled(not active)
+        self.sync_commands()
 
     def load_devices(self):
         self.busy(True)
@@ -114,12 +129,20 @@ class MainWindow(QMainWindow):
         self.task = ("devices", self.pool.submit(enumerate_devices))
 
     def reload_meetings(self):
+        selected = self.meetings.currentItem()
+        selected_id = selected.data(Qt.ItemDataRole.UserRole) if selected else None
+        selected_job = self.processing.jobs.currentData()
         self.meetings.clear()
         for row in self.store.list():
-            item = QListWidgetItem(f"{row['created'][:19]} — {row['title']} [{row['status']}]")
+            item = QListWidgetItem(f"{row['title']}\n{row['created'][:19]} · {row['status']}")
             item.setData(Qt.ItemDataRole.UserRole, row['id'])
             item.setToolTip(row['error'])
             self.meetings.addItem(item)
+            if row["id"] == selected_id:
+                self.meetings.setCurrentItem(item)
+        self.filter_meetings(self.meeting_search.text())
+        if self.meetings.currentItem() and selected_job:
+            self.processing.reload(preferred_job=selected_job)
 
     def start_recording(self):
         selected = [self.devices.item(i).data(Qt.ItemDataRole.UserRole)
@@ -143,6 +166,7 @@ class MainWindow(QMainWindow):
             self.status.setText("Finalisation des pistes…")
 
     def poll(self):
+        self.sync_commands()
         self.processing.poll_progress()
         if self.task and self.task[1].done():
             kind, future = self.task
@@ -161,6 +185,7 @@ class MainWindow(QMainWindow):
                         self.devices.addItem(item)
                     self.status.setText("Sélectionnez vos sources audio.")
                 elif kind == 'import':
+                    self.meeting_search.clear()
                     self.reload_meetings()
                     for i in range(self.meetings.count()):
                         if self.meetings.item(i).data(Qt.ItemDataRole.UserRole) == result:
@@ -197,11 +222,17 @@ class MainWindow(QMainWindow):
                 QTimer.singleShot(0, self.processing.open_speakers)
         if self.session and self.session.done.is_set():
             error = self.session.error
+            recorded_meeting = self.session.meeting_id
             self.session.thread.join()
             self.session = None
             self.busy(False)
             self.stop_button.setEnabled(False)
             self.reload_meetings()
+            self.meeting_search.clear()
+            for index in range(self.meetings.count()):
+                if self.meetings.item(index).data(Qt.ItemDataRole.UserRole) == recorded_meeting:
+                    self.meetings.setCurrentRow(index)
+                    break
             self.status.setText("Enregistrement terminé." if not error else f"Erreur : {error}")
             if error:
                 QMessageBox.warning(self, "Capture interrompue", error)

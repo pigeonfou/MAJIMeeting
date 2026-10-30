@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -46,64 +47,44 @@ class ProcessingPanel(QWidget):
         self.messages = queue.Queue(maxsize=1)
         self.settings = application_settings()
         self.current_meeting = None
-        layout = QVBoxLayout(self)
-        self.selection = QLabel('Sélectionnez une réunion dans l’onglet Enregistrement.')
-        layout.addWidget(self.selection)
+        self.selection = QLabel('Sélectionnez une réunion dans la liste à gauche.')
         self.open_saved = QPushButton('Ouvrir une transcription existante…')
         self.open_saved.clicked.connect(self.open_saved_transcript)
-        layout.addWidget(self.open_saved)
         self.import_button = QPushButton('Importer un fichier WAV, MP3, FLAC ou M4A…')
         self.import_button.clicked.connect(self.import_file)
-        layout.addWidget(self.import_button)
-        layout.addWidget(QLabel('Modèle faster-whisper local (large-v3 recommandé)'))
         self.model = QLineEdit(str(self.settings.value('model', str(
             shared_models() / 'large-v3'))))
-        layout.addWidget(self.model)
         self.browse = QPushButton('Choisir le dossier du modèle…')
         self.browse.clicked.connect(self.choose_model)
-        layout.addWidget(self.browse)
         self.download = QPushButton('Télécharger large-v3 (~3 Go, connexion requise)')
         self.download.clicked.connect(self.fetch_model)
-        layout.addWidget(self.download)
         self.download_status = QLabel('Modèle local : aucun téléchargement en cours.')
         self.download_status.setWordWrap(True)
-        layout.addWidget(self.download_status)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
         self.device = QComboBox()
         self.device.addItems(['cpu', 'cuda'])
         self.compute = QComboBox()
         self.device.currentTextChanged.connect(self.device_changed)
         self.device_changed(self.device.currentText())
         self.device.setCurrentText(str(self.settings.value('device', 'cpu')))
-        layout.addWidget(QLabel('Calcul : CPU ou CUDA ; quantification'))
-        layout.addWidget(self.device)
-        layout.addWidget(self.compute)
         self.batched = QCheckBox('Traitement par lots sur GPU (recommandé)')
         self.batched.setChecked(self.settings.value('batched', True, type=bool))
-        layout.addWidget(self.batched)
         self.batch_size = QComboBox()
         for size in (1, 2, 4, 8, 16, 32):
             self.batch_size.addItem(str(size), size)
         self.batch_size.setCurrentText(str(self.settings.value('batch_size', 8)))
-        layout.addWidget(QLabel('Taille des lots GPU : 8 conseillé pour commencer'))
-        layout.addWidget(self.batch_size)
         self.quality = QComboBox()
         self.quality.addItem('Qualité — recherche de 5 hypothèses (réglage précédent)', 5)
         self.quality.addItem('Rapide — recherche de 1 hypothèse (qualité à comparer)', 1)
         self.quality.setCurrentIndex(1 if self.settings.value('beam_size', 5, type=int) == 1 else 0)
-        layout.addWidget(self.quality)
-        layout.addWidget(QLabel('Options expérimentales GPU — à comparer séparément'))
         self.flash = QCheckBox('Flash Attention (reprise sans cette option si non pris en charge)')
         self.flash.setChecked(self.settings.value('flash_attention', False, type=bool))
-        layout.addWidget(self.flash)
         self.workers = QComboBox()
         self.workers.addItem('1 worker — référence', 1)
         self.workers.addItem('2 workers — fenêtres concurrentes, mémoire supplémentaire', 2)
         self.workers.setCurrentIndex(1 if self.settings.value('gpu_workers', 1, type=int) == 2 else 0)
-        layout.addWidget(self.workers)
         self.audio_window = QComboBox()
         self.audio_window.addItem('Fenêtres de 5 minutes — référence', 300)
         self.audio_window.addItem('Fenêtres de 10 minutes — mieux remplir les grands lots', 600)
@@ -117,68 +98,57 @@ class ProcessingPanel(QWidget):
             'Une fenêtre plus longue réduit les fins de lots incomplets sur une même piste. '
             'Elle utilise plus de RAM et peut laisser moins de fenêtres aux deux workers. '
             'Les coupures audio restent séparées. Comparez durée et transcription.')
-        layout.addWidget(self.audio_window)
         self.device_changed(self.device.currentText())
         self.compute.setCurrentText(str(self.settings.value('compute_type', self.compute.currentText())))
-        layout.addWidget(QLabel('CUDA : cuBLAS CUDA 12 + cuDNN 9 requis ; CPU sans GPU disponible.'))
         self.cuda_path = QLineEdit(str(self.settings.value('cuda_path', '')))
         self.cuda_path.setPlaceholderText('Dossier des DLL NVIDIA (facultatif, si déjà installées)')
-        layout.addWidget(self.cuda_path)
         self.cuda_browse = QPushButton('Choisir le dossier CUDA / cuDNN…')
         self.cuda_browse.clicked.connect(self.choose_cuda_path)
-        layout.addWidget(self.cuda_browse)
         self.cpu_fallback = QCheckBox('Si CUDA est indisponible, reprendre sur CPU/int8')
         self.cpu_fallback.setChecked(self.settings.value('cpu_fallback', True, type=bool))
-        layout.addWidget(self.cpu_fallback)
         self.full_analysis = QPushButton('Transcrire et proposer les intervenants…')
         self.full_analysis.clicked.connect(lambda: self.transcribe(complete=True))
-        layout.addWidget(self.full_analysis)
         self.transcribe_button = QPushButton('Transcrire uniquement (avancé)')
         self.transcribe_button.clicked.connect(self.transcribe)
-        layout.addWidget(self.transcribe_button)
         self.cancel_button = QPushButton('Annuler le traitement (après le segment en cours)')
         self.cancel_button.clicked.connect(self.cancel.set)
         self.cancel_button.setEnabled(False)
-        layout.addWidget(self.cancel_button)
-        layout.addWidget(QLabel('Historique des transcriptions — les pistes ne sont pas des personnes'))
         self.jobs = QComboBox()
         self.jobs.currentIndexChanged.connect(self.show_transcript)
-        layout.addWidget(self.jobs)
         self.execution = QLabel('')
         self.execution.setWordWrap(True)
-        layout.addWidget(self.execution)
         self.performance = QLabel('')
         self.performance.setWordWrap(True)
-        layout.addWidget(self.performance)
         self.warnings_button = QPushButton('Voir les avertissements d’horodatage…')
         self.warnings_button.clicked.connect(self.show_warnings)
         self.warnings_button.setEnabled(False)
-        layout.addWidget(self.warnings_button)
         self.text = QPlainTextEdit()
         self.text.setReadOnly(True)
-        layout.addWidget(self.text)
         self.export_button = QPushButton('Exporter la transcription (TXT ou JSON)…')
         self.export_button.clicked.connect(self.export)
-        layout.addWidget(self.export_button)
         self.speaker_button = QPushButton('Nommer les intervenants à partir de courts extraits…')
         self.speaker_button.clicked.connect(self.open_speakers)
-        layout.addWidget(self.speaker_button)
         self.edit_button = QPushButton('Corriger les textes, nommer les intervenants et réécouter…')
         self.edit_button.clicked.connect(self.open_editor)
-        layout.addWidget(self.edit_button)
-        layout.addWidget(QLabel('Essais de diarisation — paramètres et résultats conservés'))
         self.analyses = QComboBox()
         self.analyses.currentIndexChanged.connect(self.show_analysis)
-        layout.addWidget(self.analyses)
         self.analysis_details = QLabel('')
         self.analysis_details.setWordWrap(True)
-        layout.addWidget(self.analysis_details)
         self.use_analysis = QPushButton('Revenir au résultat de cette analyse')
         self.use_analysis.clicked.connect(self.activate_analysis)
-        layout.addWidget(self.use_analysis)
         self.diarize_button = QPushButton('Distinguer / réessayer avec les réglages de l’analyse sélectionnée…')
         self.diarize_button.clicked.connect(self.diarize)
-        layout.addWidget(self.diarize_button)
+        from majimeeting.workspace_ui import build_processing
+        build_processing(self)
+
+    def prepare_diarization(self):
+        from majimeeting.diarization_ui import DiarizationDialog
+        dialog = DiarizationDialog(self)
+        dialog.setWindowTitle('Préparer Community-1 — modèle et dépendances')
+        dialog.findChild(QTabWidget).setCurrentIndex(1)
+        dialog.buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Enregistrer les réglages')
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            dialog.values()
 
     def diarize(self):
         from majimeeting.diarization import diarize
@@ -214,6 +184,8 @@ class ProcessingPanel(QWidget):
                 self.window.meetings.setCurrentRow(index)
                 self.selected()
                 self.reload(preferred_job=job)
+                self.window.meeting_search.clear()
+                self.result_tabs.setCurrentIndex(0)
                 self.window.centralWidget().setCurrentIndex(1)
                 self.window.status.setText('Transcription sauvegardée ouverte ; aucun calcul relancé.')
                 return True
@@ -296,7 +268,7 @@ class ProcessingPanel(QWidget):
 
     def set_busy(self, active):
         for widget in (self.open_saved, self.jobs, self.analyses, self.use_analysis,
-                       self.import_button, self.model, self.browse, self.download, self.device,
+                       self.import_button, self.prepare_speakers, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
                        self.transcribe_button, self.full_analysis, self.speaker_button,
                        self.export_button, self.edit_button, self.diarize_button,
@@ -345,9 +317,12 @@ class ProcessingPanel(QWidget):
                                      else 'Traitement en cours…')
         self.progress_bar.setRange(0, 0)
         self.cancel_button.setText('Annuler le téléchargement' if kind == 'download'
-                                   else 'Annuler le traitement (après le segment en cours)')
+                                   else 'Annuler le traitement')
         self.cancel_button.setEnabled(cancellable)
         self.window.task = (kind, self.window.pool.submit(function, *args, **kwargs))
+        if kind in {'transcribe', 'meeting-analysis', 'diarize'}:
+            self.window.centralWidget().setCurrentIndex(1)
+            self.result_tabs.setCurrentIndex(1 if kind == 'diarize' else 0)
 
     def choose_model(self):
         path = QFileDialog.getExistingDirectory(self, 'Modèle faster-whisper local', self.model.text())
@@ -374,6 +349,7 @@ class ProcessingPanel(QWidget):
         path, _ = QFileDialog.getOpenFileName(self, 'Importer de l’audio', '',
                                              'Audio (*.wav *.mp3 *.flac *.m4a)')
         if path:
+            self.window.centralWidget().setCurrentIndex(1)
             self.submit('import', import_audio, self.window.store, path, self.cancel,
                         self.progress, cancellable=True)
 
@@ -425,6 +401,7 @@ class ProcessingPanel(QWidget):
         self.current_meeting = item.data(Qt.ItemDataRole.UserRole) if item else None
         self.selection.setText(item.text() if item else 'Sélectionnez une réunion.')
         self.reload()
+        self.window.sync_commands()
 
     def reload(self, preferred_job=None):
         selected = preferred_job or self.jobs.currentData()

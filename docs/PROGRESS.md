@@ -1,6 +1,6 @@
 # Progression MAJIMeeting
 
-Mise à jour : 29 octobre 2026.
+Mise à jour : 30 octobre 2026.
 
 ## État global
 Jalon 2 : vitesse et résultats de transcription validés par l'utilisateur sur la réunion
@@ -631,3 +631,25 @@ stable restent à réaliser.
 - Paquet code publié :166936octets (~167ko), contre104860850octets (~105Mo) pour l'installateur. Bootstrap ZIP :6910octets ; bibliothèques téléchargées séparément lors de la première installation, modèles non retéléchargés.
 - Vérification réelle du dépôt public depuis le gestionnaire : découverte de la dernière release DEV, téléchargement du manifeste et du ZIP, extraction et toutes les empreintes validées pour `64d28caff728375eeb50a3f454e649729a1955df`. Aucun déploiement sur le PC utilisateur réalisé à distance.
 - À réaliser : extraire le bootstrap, lancer Installer-DEV.cmd, tester les raccourcis, copier le catalogue application fermée, puis valider capture et CUDA depuis DEV. La première installation reste plus longue ; les changements de code suivants réutilisent l'environnement. Le retour arrière nécessite une version précédente compatible déjà téléchargée.
+
+
+## Réorganisation de l’interface — 30 octobre 2026
+
+- Colonne permanente Mes réunions, recherche et import ; sélection conservée après
+  rafraîchissement, réunion capturée sélectionnée à l’arrêt.
+- Trois espaces : Enregistrer, Transcription et intervenants, Paramètres.
+- Résultats séparés en Texte, Intervenants et Diagnostic. Les modèles et réglages
+  GPU ne prennent plus la place du texte ; historique et corrections conservés.
+- Préparation Community-1 accessible sans transcription, depuis les Paramètres.
+- Menus Fichier, Enregistrement, Analyse et Affichage ; raccourcis clavier.
+- Progression et annulation communes à tous les écrans ; menus soumis au même
+  verrou de traitement que les boutons. Thème mémorisé par canal.
+- Guide : `docs/INTERFACE.md`.
+- Tests locaux : 155 tests existants réussis après la première réorganisation ;
+  9 tests ciblés interface/navigation réussis après ajout de quatre scénarios.
+  Vérification visuelle Qt hors écran en clair et sombre (1280×820 et 1000×700).
+  Suite finale locale : 159 tests réussis et Ruff réussi. CI Windows/Linux et publication DEV : en cours.
+- À réaliser sur le PC utilisateur : validation ergonomique Windows, mise à jour DEV,
+  capture WASAPI et traitement CUDA avec la nouvelle disposition.
+- Jalons fonctionnels inchangés : le prétraitement / réordonnancement du pipeline
+  et les comptes rendus LLM restent à développer ; essais matériels reportés conservés.
