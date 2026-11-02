@@ -228,6 +228,10 @@ class ProcessingPanel(QWidget):
                    f"passages ambigus ; {timing}. Calcul : {options.get('device', '?')}. "
                    f"Exact : {options.get('speakers', 0)} ; réglages : {options.get('tuning', 'modèle')}. "
                    'Les corrections individuelles restent prioritaires. ')
+        if options.get('engine') == 'guided-references/Community-1':
+            details += (f" Correction par extraits : cosinus minimal={options.get('minimum_similarity')} ; "
+                        f"écart minimal={options.get('minimum_margin')} ; "
+                        f"{options.get('accepted', 0)} proposition(s) retenue(s). Aucun nouveau décodage Whisper. ")
         alignment = options.get('word_alignment', {})
         if alignment:
             details += (f" Alignement du texte existant : {alignment.get('aligned', 0)} passage(s), "
@@ -273,7 +277,7 @@ class ProcessingPanel(QWidget):
                        self.import_button, self.prepare_speakers, self.pipeline_controls, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
                        self.transcribe_button, self.full_analysis, self.speaker_button,
-                       self.export_button, self.edit_button, self.diarize_button,
+                       self.export_button, self.edit_button, self.diarize_button, self.guided_button,
                        self.batched, self.batch_size, self.quality, self.flash, self.workers, self.audio_window):
             widget.setEnabled(not active)
         if not active:
@@ -513,6 +517,15 @@ class ProcessingPanel(QWidget):
         dialog.exec()
         self.show_transcript()
 
+    def open_guided(self):
+        job = self.jobs.currentData()
+        if not job:
+            return
+        from majimeeting.guided_ui import GuidedVoiceDialog
+        dialog = GuidedVoiceDialog(self.window.store,job,self)
+        dialog.exec()
+        self.show_transcript()
+
     def open_editor(self):
         job = self.jobs.currentData()
         if not job:
@@ -571,10 +584,13 @@ class ProcessingPanel(QWidget):
             corrections = [dict(r) for r in db.execute('SELECT e.* FROM segment_edits e JOIN transcript_segments s '
                                                       'ON s.id=e.segment_id WHERE s.job_id=? ORDER BY e.id', (job,))]
         if Path(path).suffix.lower() == '.json':
+            from majimeeting.guided_store import guided_history, references
             from majimeeting.speakers import history
             text = json.dumps({'job_id': job, 'segments': rows, 'source_segments': sources,
                                'word_timestamps': words, 'source_corrections': corrections,
                                'diarization': history(self.window.store, job),
+                               'voice_references': references(self.window.store, job),
+                               'guided_history': guided_history(self.window.store, job),
                                'pipeline': details.get('pipeline', {}),
                                'execution': details.get('execution', {}),
                                'performance': details.get('metrics', {}),

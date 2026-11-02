@@ -34,7 +34,7 @@ jobs:
             pyproject.toml
       - name: Linux Qt libraries
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libpulse0
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libpulse0 libseccomp2
       - name: Install pinned Windows runtime
         if: runner.os == 'Windows'
         run: python -m pip install -r requirements-dev-runtime.txt
@@ -42,18 +42,41 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Dependency consistency
         run: python -m pip check
-      - name: Tests
-        run: python -m pytest -q
+      - name: Tests without network (Linux)
+        if: runner.os == 'Linux'
+        run: python -S scripts/offline_checks.py python -m pytest -q
+      - name: Tests without network (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/offline-windows.ps1 -Python (Get-Command python).Source -Arguments @('-m','pytest','-q')
       - name: Lint
         run: python -m ruff check .
-      - name: Source GUI startup
-        run: python -I scripts/run_source.py --smoke-test
-      - name: Source editor and audio smoke
-        run: python -I scripts/run_source.py --editor-smoke
+      - name: Source GUI startup without network (Linux)
+        if: runner.os == 'Linux'
+        run: python -S scripts/offline_checks.py python -I scripts/run_source.py --smoke-test
+      - name: Source editor and audio smoke without network (Linux)
+        if: runner.os == 'Linux'
+        run: python -S scripts/offline_checks.py python -I scripts/run_source.py --editor-smoke
+      - name: Source GUI startup without network (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/offline-windows.ps1 -Python (Get-Command python).Source -Arguments @('-I','scripts/run_source.py','--smoke-test')
+      - name: Source editor and audio smoke without network (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/offline-windows.ps1 -Python (Get-Command python).Source -Arguments @('-I','scripts/run_source.py','--editor-smoke')
       - name: Download tiny integration model
         run: python -I scripts/run_source.py --download-smoke test-model
-      - name: Real CPU transcription and alignment offline
-        run: python -I scripts/run_source.py --inference-smoke test-model
+      - name: Real CPU transcription and alignment without network (Linux)
+        if: runner.os == 'Linux'
+        run: python -S scripts/offline_checks.py python -I scripts/run_source.py --inference-smoke test-model
+        env:
+          HF_HUB_OFFLINE: '1'
+          HF_HUB_DISABLE_TELEMETRY: '1'
+      - name: Real CPU transcription and alignment without network (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/offline-windows.ps1 -Python (Get-Command python).Source -Arguments @('-I','scripts/run_source.py','--inference-smoke','test-model')
         env:
           HF_HUB_OFFLINE: '1'
           HF_HUB_DISABLE_TELEMETRY: '1'
@@ -85,10 +108,10 @@ jobs:
           $python = Join-Path $root ("runtimes/" + $state.current.runtime.Substring(0,16) + "/Scripts/python.exe")
           $entry = Join-Path $root ("versions/" + $state.current.commit + "/scripts/run_source.py")
           $env:MAJIMEETING_CHANNEL = 'dev'
-          & $python -I -X utf8 $entry --editor-smoke
+          ./scripts/offline-windows.ps1 -Python $python -Arguments @('-I','-X','utf8',$entry,'--editor-smoke')
           if ($LASTEXITCODE -ne 0) { throw 'Fresh DEV runtime editor failed' }
           $env:HF_HUB_OFFLINE = '1'
-          & $python -I -X utf8 $entry --inference-smoke (Resolve-Path test-model).Path
+          ./scripts/offline-windows.ps1 -Python $python -Arguments @('-I','-X','utf8',$entry,'--inference-smoke',(Resolve-Path test-model).Path)
           if ($LASTEXITCODE -ne 0) { throw 'Fresh DEV runtime inference failed' }
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'

@@ -22,7 +22,11 @@ from PySide6.QtWidgets import (
 from majimeeting.playback import make_excerpt
 from majimeeting.speakers import latest_run, name_group
 
-REASONS = dict(overlap='Paroles simultanées', voice_boundary='Changement de voix incertain',
+REASONS = dict(guided_uncertain='Référence insuffisamment distincte',
+               guided_transition='Comparaisons voisines discordantes',
+               guided_close_references='Références vocales trop proches',
+               guided_no_embedding='Contexte vocal insuffisant ou silence',
+               guided_unselected='Proposition non retenue', overlap='Paroles simultanées', voice_boundary='Changement de voix incertain',
                uncovered='Voix non attribuée', low_alignment_confidence='Alignement du mot incertain',
                word_alignment_missing='Alignement mot à mot nécessaire',
                manual_source_correction='Correction existante : découpage à vérifier')

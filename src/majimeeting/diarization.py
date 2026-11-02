@@ -132,11 +132,13 @@ def prepare_track(track, destination, cancel=None):
     return origin, position / 16000
 
 
-def run_worker(python, model, audio, result, device, speakers, cancel, progress, tuning=None):
+def run_worker(python, model, audio, result, device, speakers, cancel, progress, tuning=None,
+               worker_code=None, extra=None):
     request = result.with_suffix('.request.json')
     request.write_text(json.dumps(dict(model=str(model), audio=str(audio), result=str(result),
                                       device=device, speakers=speakers,
-                                      tuning=tuning or DiarizationOptions().for_track('', speakers))), encoding='utf-8')
+                                      tuning=tuning or DiarizationOptions().for_track('', speakers),
+                                      **(extra or {}))), encoding='utf-8')
     environment = os.environ.copy()
     # A frozen app's Python paths/DLL search hints must not contaminate the runtime.
     for key in ('PYTHONHOME', 'PYTHONPATH'):
@@ -145,7 +147,7 @@ def run_worker(python, model, audio, result, device, speakers, cancel, progress,
                        PYANNOTE_METRICS_ENABLED='false', OTEL_SDK_DISABLED='true')
     log = result.with_suffix('.log')
     with log.open('w', encoding='utf-8') as output, log.open('r', encoding='utf-8', errors='replace') as events:
-        process = subprocess.Popen([str(python), '-I', '-X', 'utf8', '-c', WORKER, str(request)],
+        process = subprocess.Popen([str(python), '-I', '-X', 'utf8', '-c', worker_code or WORKER, str(request)],
                                    stdout=output, stderr=output, env=environment,
                                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         try:

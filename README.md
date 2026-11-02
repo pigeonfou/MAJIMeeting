@@ -84,3 +84,11 @@ transcription par lots puis reconstruction/nomination. Audio, VAD et voix sont s
 séparément pour les itérations. Le parcours classique reste sélectionné par défaut.
 Voir [le guide de comparaison](docs/AUDIO_FIRST.md) ; qualité et vitesse à mesurer sur
 les réunions réelles, compte rendu LLM encore à développer.
+
+
+## Correction guidée des voix proches (expérimental)
+
+Lorsque le regroupement automatique mélange des personnes, quelques extraits propres
+nommés servent à proposer une réattribution aux mots, sans refaire Whisper. Un aperçu
+précède toute application ; une nouvelle analyse conserve le retour arrière et les
+corrections manuelles. Voir [le guide et les limites](docs/GUIDED_VOICES.md).

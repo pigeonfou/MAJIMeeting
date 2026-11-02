@@ -37,6 +37,8 @@ class MeetingStore:
             schema(db)
             from majimeeting.word_alignment import schema as word_schema
             word_schema(db)
+            from majimeeting.guided_store import schema as guided_schema
+            guided_schema(db)
 
     @contextmanager
     def connect(self):
@@ -73,6 +75,7 @@ class MeetingStore:
                                 "WHERE status='recording'")
             db.execute("UPDATE transcription_jobs SET status='interrupted' WHERE status='running'")
             db.execute("UPDATE diarization_runs SET status='interrupted' WHERE status='running'")
+            db.execute("UPDATE guided_runs SET status='interrupted' WHERE status='running'")
             return result.rowcount
 
     def start_transcription(self, job, meeting_id, options):

@@ -737,3 +737,37 @@ stable restent à réaliser.
   sans refaire Whisper et les compteurs de réutilisation dans Diagnostic.
 - Qualification sur réunions longues, interruptions matérielles, filtrage facultatif
   et compte rendu LLM restent à réaliser. Aucun gain de qualité ou vitesse promis.
+
+
+## 2 novembre 2026 — correction guidée des voix proches
+
+- Retour utilisateur : nouveau parcours fonctionnel, mais voix toujours confondues malgré
+  essais de paramètres séparés. Ajout d’une correction par exemples de voix, sans nouveau
+  décodage Whisper : références de3–20s, noms, piste et groupe cibles explicites.
+- Empreintes du modèle local Community-1 dans le runtime isolé, CPU/CUDA vérifié ;
+  propositions aux mots avec seuil cosinus/écart, accord de fenêtres voisines et
+  abstention. Références presque identiques et chevauchements restent incertains.
+- Aperçu avant application ; cases pour retenir ou laisser à vérifier, nouvelle analyse
+  indépendante et retour possible à l’ancienne. Texte/originaux conservés ; segments
+  contenant des corrections individuelles protégés en entier, autres groupes inchangés.
+- Références et caches distincts de passages/références ; changements de seuils sans
+  inférence supplémentaire. Instantané du texte, noms, références et analyse ; refus
+  d’un aperçu obsolète ou d’une source audio modifiée avant application atomique.
+- Schéma SQLite additif, historique et export JSON enrichi sans vecteurs bruts. Bouton
+  depuis Intervenants et depuis l’éditeur avec présélection du passage.
+- Tests ciblés locaux :23nouveaux tests réussis et31tests audio-first/interlocuteurs
+  existants réussis ; Ruff et contrôle Qt éditeur/lecture/nouveau dialogue réussis.
+  Modèle d’empreintes simulé : aucune validation de qualité réelle ou de GPU déclarée.
+- Deux exécutions de suite locale complète bloquées par le contrôle automatique pour
+  tentative de télémétrie Microsoft de contenu non établi. ONNX désactivé explicitement,
+  puis validation préparée avec réseau bloqué au niveau OS ; origine exclusive de la
+  tentative non établie. Tests Linux locaux isolés : attente dans QAudioOutput dans cet
+  environnement sans périphérique/IPC audio utilisable, pas de succès global local annoncé.
+- CI source renforcée : tests et contrôles hors Internet sous seccomp Linux / pare-feu
+  temporaire du runner Windows. Téléchargements autorisés uniquement dans les étapes
+  connectées explicites. Aucune règle pare-feu installée automatiquement sur PC utilisateur.
+- Guide :docs/GUIDED_VOICES.md. CI et publication DEV à terminer.
+- À réaliser sur PC utilisateur : deux/trois extraits isolés par personne du groupe
+  confondu, aperçu puis quelques écoutes de contrôle, application/restauration et
+  diagnostic du modèle d’empreintes CUDA. Précision, voix inconnues non représentées,
+  faibles niveaux et vraies superpositions restent à qualifier. LLM toujours à développer.

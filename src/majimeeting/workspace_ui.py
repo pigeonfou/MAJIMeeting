@@ -89,6 +89,9 @@ def build_processing(panel):
                              'Les passages ambigus restent à vérifier dans l’éditeur.')
     panel.speaker_button.setText('Nommer les intervenants par extraits…')
     content.addWidget(panel.speaker_button)
+    panel.guided_button = QPushButton('Séparer des voix confondues avec des extraits de référence…')
+    panel.guided_button.clicked.connect(panel.open_guided)
+    content.addWidget(panel.guided_button)
     panel.diarize_button.setText('Réessayer la diarisation…')
     section(content, 'Analyses conservées', [
         ('Analyse', panel.analyses), ('', panel.use_analysis),
@@ -214,6 +217,7 @@ def build_workspace(window, recording):
     command(analysis_menu, 'Nommer les intervenants…', panel.speaker_button, destination=1)
     command(analysis_menu, 'Corriger et réécouter…', panel.edit_button, destination=1)
     command(analysis_menu, 'Relancer la diarisation…', panel.diarize_button, destination=1)
+    command(analysis_menu, 'Séparer des voix confondues…', panel.guided_button, destination=1)
     view_menu = window.menuBar().addMenu('&Affichage')
     for index, title in enumerate(('Enregistrer', 'Transcription et intervenants', 'Paramètres')):
         action = view_menu.addAction(title)
