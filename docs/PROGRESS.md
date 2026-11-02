@@ -780,3 +780,23 @@ stable restent à réaliser.
 - Première CI Windows41473785505 :201tests réussis/1échec, assertion du test de worker
   utilisant des séparateurs Linux. Le worker reçoit bien un chemin Windows natif.
   Test corrigé via Path.parts ; validation finale203tests relancée. Aucun paquet publié.
+
+
+## Correction de sélection des releases DEV — 2 novembre 2026
+
+- Contrôle réel de publication guidée : le gestionnaire ancien a sélectionné33cadda
+  au lieu de012d527, car la liste de releases GitHub présentait l’ancienne publication
+  en première position malgré une date publiée plus récente pour012d527.
+- Correction : tri explicite par published_at, vérification des manifestes conservée,
+  requêtes sans cache. Bootstrap frais capable d’actualiser une installation existante
+  via --refresh, sans changer le catalogue actif ou effacer la version précédente.
+- L’ancien lanceur pouvant rester sur l’ancienne version, première réparation par
+  téléchargement du nouveau Setup ZIP et relance Installer-DEV.cmd ; raccourci ensuite.
+- Tests ajoutés : API non chronologique, manifeste incohérent sans retour silencieux
+  à une ancienne version, réparation hors ligne et bootstrap actualisant un état existant
+  avec conservation des données et du retour arrière. CI PowerShell5 étendue à deux
+  installations successives avec changement de révision et marqueur de données préservé.
+- Correction guidée déjà validée en CI203tests Windows/Linux : PR19 fusionnée012d527,
+  publication41476392862 réussie. La correction du lanceur doit être validée et publiée
+  avant de recommander la mise à jour au PC utilisateur. Aucun succès de mise à jour
+  réelle utilisateur annoncé à ce stade.

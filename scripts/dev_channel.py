@@ -85,7 +85,8 @@ def fetch(url, limit=MAX_ARCHIVE):
                            'https://github.com/' + REPOSITORY + '/releases/download/')):
         raise ValueError('URL de mise à jour étrangère au dépôt.')
     request = urllib.request.Request(url, headers={'User-Agent': 'MAJIMeeting-DEV',
-                                                  'Accept': 'application/vnd.github+json'})
+                                                  'Accept': 'application/vnd.github+json',
+                                                  'Cache-Control': 'no-cache'})
     with urllib.request.urlopen(request, timeout=30) as response:
         content = response.read(limit + 1)
     if len(content) > limit:
@@ -96,6 +97,7 @@ def fetch(url, limit=MAX_ARCHIVE):
 def latest_bundle():
     print('Recherche de la dernière version DEV validée…', flush=True)
     releases = json.loads(fetch(f'https://api.github.com/repos/{REPOSITORY}/releases?per_page=100', 4 * 1024**2))
+    releases.sort(key=lambda r: r.get('published_at') or r.get('created_at') or '', reverse=True)
     for release in releases:
         commit = release['tag_name'].removeprefix('dev-')
         if not release['tag_name'].startswith('dev-') or not SHA.fullmatch(commit) or release['draft']:
@@ -309,6 +311,10 @@ def notify(message, error=False):
         ctypes.windll.user32.MessageBoxW(None, message, 'MAJIMeeting DEV', 0x10 if error else 0x40)
 
 
+def bootstrap_supported():
+    return sys.version_info[:2] == (3, 11) and sys.platform == 'win32' and sys.maxsize > 2**32
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
@@ -316,6 +322,7 @@ def main():
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--bundle', type=Path)
     parser.add_argument('--smoke', action='store_true')
+    parser.add_argument('--refresh', action='store_true', help='Also update an existing installation during bootstrap')
     args = parser.parse_args()
     root = args.root.resolve()
     try:
@@ -325,7 +332,7 @@ def main():
                 run(root, state, ['--smoke-test'] if args.smoke else [])
                 return 0
             if args.action == 'bootstrap':
-                if sys.version_info[:2] != (3, 11) or sys.platform != 'win32' or sys.maxsize <= 2**32:
+                if not bootstrap_supported():
                     raise RuntimeError('Installez Python3.11 x64 avec le lanceur py, puis relancez.')
                 if state:
                     source = root / 'versions' / state['current']['commit']
@@ -333,8 +340,9 @@ def main():
                     temporary = root / 'launcher.tmp'
                     shutil.copyfile(source / 'scripts/dev_launch.py', temporary)
                     os.replace(temporary, root / 'launcher.py')
-                    notify('DEV est déjà installé. Les raccourcis vont être réparés ; utilisez ensuite Mettre à jour.')
-                    return 0
+                    if not args.refresh:
+                        notify('DEV est déjà installé. Les raccourcis vont être réparés ; utilisez ensuite Mettre à jour.')
+                        return 0
             @contextlib.contextmanager
             def available():
                 if state:

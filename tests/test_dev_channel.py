@@ -166,3 +166,67 @@ def test_source_builder_excludes_untracked_files_and_packages_bootstrap(tmp_path
     assert 'scripts/untracked-secret.txt' not in manifest['files']
     with zipfile.ZipFile(output / 'MAJIMeeting-DEV-Setup.zip') as archive:
         assert set(archive.namelist()) == {'Installer-DEV.cmd', 'install-dev.ps1', 'dev_channel.py'}
+
+
+def test_latest_release_uses_publication_date_not_api_order(monkeypatch):
+    import json
+    old='3'*40
+    new='0'*40
+    def release(commit,date):
+        return dict(tag_name='dev-'+commit,draft=False,published_at=date,assets=[
+            dict(name='dev-manifest.json',browser_download_url='manifest-'+commit),
+            dict(name='MAJIMeeting-DEV.zip',browser_download_url='archive-'+commit)])
+    listings=[release(old,'2026-11-02T09:57:54Z'),release(new,'2026-11-02T16:01:16Z')]
+    calls=[]
+    def fetch(url,*args):
+        calls.append(url)
+        if 'releases?' in url:
+            return json.dumps(listings).encode()
+        if url=='manifest-'+new:
+            return json.dumps({'commit':new}).encode()
+        if url=='archive-'+new:
+            return b'new-archive'
+        pytest.fail('Must not fetch an older first-listed release')
+    monkeypatch.setattr(channel,'fetch',fetch)
+    manifest,archive=channel.latest_bundle()
+    assert manifest['commit']==new and archive==b'new-archive'
+    assert len(calls)==3
+
+
+def test_latest_manifest_mismatch_never_falls_back_to_old_code(monkeypatch):
+    import json
+    new='0'*40
+    listing=[dict(tag_name='dev-'+new,draft=False,published_at='2026-11-02T16:01:16Z',assets=[
+        dict(name='dev-manifest.json',browser_download_url='manifest'),
+        dict(name='MAJIMeeting-DEV.zip',browser_download_url='archive')])]
+    monkeypatch.setattr(channel,'fetch',lambda url,*a: json.dumps(listing if 'releases?' in url else {'commit':'a'*40}).encode())
+    with pytest.raises(ValueError,match='correspond'):
+        channel.latest_bundle()
+
+
+def test_fresh_bootstrap_can_upgrade_old_installed_manager_without_losing_catalogue(tmp_path,monkeypatch):
+    import json
+    old,old_archive=bundle('a'*40)
+    new,new_archive=bundle('b'*40)
+    activate=channel.activate
+    def noop(*a):
+        return None
+    activate(tmp_path,old,old_archive,noop,noop)
+    (tmp_path/'data').mkdir(exist_ok=True)
+    (tmp_path/'data'/'keep').write_text('meeting preserved')
+    monkeypatch.setattr(channel,'activate',lambda root,manifest,archive: activate(root,manifest,archive,noop,noop))
+    monkeypatch.setattr(channel,'bootstrap_supported',lambda: True)
+    monkeypatch.setattr(channel,'notify',noop)
+    monkeypatch.setattr(channel,'latest_bundle',lambda: pytest.fail('Offline repair must not contact the network'))
+    monkeypatch.setattr(sys,'argv',['manager','--root',str(tmp_path),'bootstrap'])
+    assert channel.main()==0
+    assert channel.read_state(tmp_path)['current']['commit']=='a'*40
+    monkeypatch.setattr(channel,'latest_bundle',lambda:(new,new_archive))
+    monkeypatch.setattr(sys,'argv',['manager','--root',str(tmp_path),'bootstrap','--refresh'])
+    assert channel.main()==0
+    state=channel.read_state(tmp_path)
+    assert state['current']['commit']=='b'*40 and state['previous']['commit']=='a'*40
+    assert Path(state['data'])==tmp_path/'data' and (tmp_path/'data'/'keep').read_text()=='meeting preserved'
+    assert channel.main()==0
+    assert channel.read_state(tmp_path)['previous']==state['previous']
+    assert json.loads((tmp_path/'state.json').read_text())['data']==state['data']
