@@ -54,3 +54,8 @@ y compris dans les menus ; l’annulation attend la fin du segment en cours.
 
 Les dialogues spécialisés de correction, de nomination et de réglage Community-1
 restent disponibles depuis ces espaces. Aucun compte rendu LLM n’est encore généré.
+
+
+Le parcours expérimental **audio → VAD → voix → transcription** est sélectionnable
+dans Paramètres. Voir [son guide et ses limites](AUDIO_FIRST.md). Le parcours classique
+reste proposé par défaut pour faciliter la comparaison.

@@ -72,8 +72,13 @@ if request['device'] == 'cuda':
 turns = []
 for turn, _, label in output.speaker_diarization.itertracks(yield_label=True):
     turns.append({'start': turn.start, 'end': turn.end, 'label': str(label)})
+exclusive = getattr(output, 'exclusive_speaker_diarization', None)
+exclusive_turns = []
+if exclusive is not None:
+    for turn, _, label in exclusive.itertracks(yield_label=True):
+        exclusive_turns.append(dict(start=turn.start, end=turn.end, label=str(label)))
 with open(request['result'], 'w', encoding='utf-8') as target:
-    json.dump(dict(turns=turns, effective=effective), target)
+    json.dump(dict(turns=turns, exclusive_turns=exclusive_turns, effective=effective), target)
 '''
 
 
@@ -213,9 +218,17 @@ def diarize(store, job, python, model, device='cpu', speakers=0, cancel=None,
     if device not in {'cpu', 'cuda'} or not isinstance(speakers, int) or not 0 <= speakers <= 50:
         raise ValueError('Paramètres de diarisation invalides.')
     with store.connect() as db:
-        record = db.execute('SELECT meeting_id FROM transcription_jobs WHERE id=?', (job,)).fetchone()
+        record = db.execute('SELECT meeting_id,status,options FROM transcription_jobs WHERE id=?', (job,)).fetchone()
     if record is None:
         raise ValueError('Transcription introuvable.')
+    pipeline = json.loads(record['options']).get('pipeline', {})
+    if pipeline.get('mode') == 'audio_first_v1':
+        if record['status'] != 'completed':
+            raise ValueError('Choisissez une transcription terminée.')
+        from majimeeting.audio_first_pipeline import reanalyze_audio_first
+        return reanalyze_audio_first(store, job, record['meeting_id'], pipeline,
+                                     python, model, device, speakers, tuning, cancel, progress,
+                                     worker, whisper_model_path)
     rows = store.segments(job)
     tracks = sorted({r['track'] for r in rows})
     if not tracks:

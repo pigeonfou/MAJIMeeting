@@ -222,6 +222,8 @@ class ProcessingPanel(QWidget):
         options = json.loads(row['options'])
         seconds = options.get('total_seconds')
         timing = f'{seconds:.1f} s' if seconds is not None else 'durée non mesurée'
+        if options.get('mode') == 'audio_first_v1':
+            timing += ' (parcours complet)' if options.get('scope') == 'complete_pipeline' else ' (réanalyse des voix)'
         details = (f"{row['groups']} groupe(s) au total ; {row['ambiguous']}/{row['segments']} "
                    f"passages ambigus ; {timing}. Calcul : {options.get('device', '?')}. "
                    f"Exact : {options.get('speakers', 0)} ; réglages : {options.get('tuning', 'modèle')}. "
@@ -268,7 +270,7 @@ class ProcessingPanel(QWidget):
 
     def set_busy(self, active):
         for widget in (self.open_saved, self.jobs, self.analyses, self.use_analysis,
-                       self.import_button, self.prepare_speakers, self.model, self.browse, self.download, self.device,
+                       self.import_button, self.prepare_speakers, self.pipeline_controls, self.model, self.browse, self.download, self.device,
                        self.compute, self.cuda_path, self.cuda_browse, self.cpu_fallback,
                        self.transcribe_button, self.full_analysis, self.speaker_button,
                        self.export_button, self.edit_button, self.diarize_button,
@@ -385,10 +387,25 @@ class ProcessingPanel(QWidget):
             from majimeeting.meeting_pipeline import process_meeting
             folder = self.window.store.root / self.current_meeting
             tracks = sorted(p.name for p in folder.glob('track-*') if p.is_dir())
+            audio_first = self.pipeline_controls.mode.currentData() == 'audio_first_v1'
+            preparation = self.pipeline_controls.values()
             dialog = DiarizationDialog(self, tracks=tracks, transcribe_first=True)
+            if audio_first:
+                dialog.setWindowTitle('Préparer l’audio, analyser les voix et transcrire')
+                dialog.controls.layout().itemAt(0).widget().setText(
+                    'Parcours expérimental : copies audio et détection de parole, '
+                    'diarisation globale, puis transcription et nomination par extraits. '
+                    'Les originaux restent conservés ; les voix simultanées restent à vérifier.')
+                dialog.buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Lancer le nouveau parcours')
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             python, model, device, speakers, tuning = dialog.values()
+            if audio_first:
+                from majimeeting.audio_first_pipeline import process_audio_first
+                self.submit('meeting-analysis', process_audio_first, self.window.store, self.current_meeting,
+                            options, python, model, device, speakers, DiarizationOptions(**tuning),
+                            preparation, self.cancel, self.progress, cancellable=True)
+                return
             self.submit('meeting-analysis', process_meeting, self.window.store, self.current_meeting,
                         options, python, model, device, speakers, DiarizationOptions(**tuning),
                         self.cancel, self.progress, cancellable=True)
@@ -462,6 +479,18 @@ class ProcessingPanel(QWidget):
             if last.get('gpu_workers', 1) == 2:
                 self.performance.setText(self.performance.text() +
                     ' Les temps inférence/écriture sont cumulés entre workers et peuvent dépasser la durée totale.')
+        pipeline = details.get('pipeline', {})
+        if pipeline.get('mode') == 'audio_first_v1':
+            stages = pipeline.get('stages', [])
+            self.performance.setText(self.performance.text() +
+                f"\nNouveau parcours : audio → VAD → voix → Whisper. "
+                f"Avant transcription : {pipeline.get('pre_transcription_seconds', 0):.1f} s. "
+                f"Copies réutilisées : {sum(s['audio_reused'] for s in stages)}/{len(stages)} ; "
+                f"VAD réutilisés : {sum(s['vad_reused'] for s in stages)}/{len(stages)} ; "
+                f"voix réutilisées : {sum(v['reused'] for v in pipeline.get('voices', []))}. "
+                'Le temps total ci-dessus mesure Whisper, pas l’ensemble du parcours.')
+            if pipeline.get('no_speech'):
+                self.execution.setText('Aucune parole détectée : modèles Whisper et Community-1 non chargés.')
         counts = self.window.store.warning_counts(job) if job else {}
         warning_count = sum(counts.values())
         self.warnings_button.setEnabled(warning_count > 0)
@@ -546,6 +575,7 @@ class ProcessingPanel(QWidget):
             text = json.dumps({'job_id': job, 'segments': rows, 'source_segments': sources,
                                'word_timestamps': words, 'source_corrections': corrections,
                                'diarization': history(self.window.store, job),
+                               'pipeline': details.get('pipeline', {}),
                                'execution': details.get('execution', {}),
                                'performance': details.get('metrics', {}),
                                'timestamp_warnings': [dict(row) for row in

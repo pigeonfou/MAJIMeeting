@@ -80,7 +80,7 @@ class DiarizationDialog(QDialog):
         preparation_scroll.setWidget(preparation)
         tabs.addTab(preparation_scroll, 'Modèle et dépendances')
         self.speakers = self.controls.speakers
-        label = QLabel('Analyse après transcription, sans serveur. Les groupes ne constituent '
+        label = QLabel('Analyse locale, sans serveur. Les groupes ne constituent '
                        'pas une identification des personnes. Chaque piste a ses propres groupes. '
                        'Les passages ambigus restent à vérifier.\n\n'
                        'Préparation initiale avec connexion : installez les dépendances puis '
