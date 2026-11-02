@@ -703,9 +703,37 @@ stable restent à réaliser.
   réel ; Community-1 simulé pour cet essai (modèle soumis à accès, pas de réunion réelle).
   Contrôle local Whisper CPU réel réussi : séquentiel et lots avec clips ;
   modèle tiny sur silence synthétique, sans validation de qualité. CI Windows/Linux
-  et publication DEV à terminer.
+  et publication DEV validées ci-dessous.
 - Guide : `docs/AUDIO_FIRST.md`. À réaliser sur PC utilisateur : comparer les deux
   parcours sur la même réunion, temps global, mots faibles et aux changements de voix,
   nombre de groupes, passages simultanés, CUDA, longues réunions et reprise après kill.
 - Filtrage spectral/débruitage, qualification du nouveau parcours et compte rendu LLM
   restent à réaliser ; aucun gain de qualité ou de vitesse déclaré à ce stade.
+
+### Validation et publication du parcours audio-first
+
+- [PR nº18](https://github.com/pigeonfou/MAJIMeeting/pull/18) fusionnée ; source finale
+  `2bc4785cdbe8cdf92f1da40133c8f705569e6f8b`, fusion `33cadda3334ded064ff82ea66f8a54149d1f83bf`.
+- [CI PR 41423700126](https://github.com/pigeonfou/MAJIMeeting/actions/runs/41423700126)
+  et [publication main 41424298237](https://github.com/pigeonfou/MAJIMeeting/actions/runs/41424298237)
+  réussies :179tests Windows et179tests Linux, Ruff et cohérence des dépendances,
+  démarrage Qt, corrections/lecture WAV, VAD réel ONNX hors ligne et Whisper tiny CPU
+  réel sur les clips du nouveau parcours en séquentiel, lots et deux workers.
+- Community-1 est simulé dans l’essai d’enchaînement : aucune validation de précision
+  des groupes, de parole réelle ou de CUDA sur le nouveau parcours n’est déclarée.
+- [Release DEV publiée](https://github.com/pigeonfou/MAJIMeeting/releases/tag/dev-33cadda3334ded064ff82ea66f8a54149d1f83bf).
+  Paquet code :195855octets ; SHA-256
+  `448ccce6e3098826f3b6c7aebac3d7498cf19123cd9fa0f7f112d8985f1427b0`.
+- Vérification réelle du paquet public par le gestionnaire : découverte de cette
+  révision, téléchargement, extraction, contrôle de toutes les empreintes et présence
+  des quatre nouveaux modules validés. Pas de déploiement distant sur PC utilisateur.
+- Distribution par le canal DEV, dépendances et schéma de données inchangés. Fermer
+  l’application puis utiliser **Mettre a jour et lancer MAJIMeeting DEV**. Dans Paramètres,
+  choisir **Expérimental — audio, voix puis transcription**. Classique reste le défaut
+  jusqu’à comparaison et choix de l’utilisateur ; modèles locaux existants réutilisables.
+- Premier essai utilisateur à réaliser : même réunion et réglages GPU habituels,
+  normalisation désactivée, VAD0,50/silence500ms ; comparer texte, changements de voix,
+  mots faibles, chevauchements et temps complet. Vérifier ensuite la réanalyse des voix
+  sans refaire Whisper et les compteurs de réutilisation dans Diagnostic.
+- Qualification sur réunions longues, interruptions matérielles, filtrage facultatif
+  et compte rendu LLM restent à réaliser. Aucun gain de qualité ou vitesse promis.
