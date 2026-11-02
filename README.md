@@ -75,3 +75,12 @@ Trois espaces : **Enregistrer**, **Transcription et intervenants**, **Paramètre
 Les résultats sont répartis en **Texte**, **Intervenants** et **Diagnostic** ; progression
 et annulation restent visibles partout. Voir [le guide de l’interface](docs/INTERFACE.md).
 Les changements d’interface sont distribués par le canal DEV.
+
+
+## Parcours audio avant transcription (expérimental)
+
+Le canal DEV propose un parcours optionnel : préparation audio, VAD, diarisation globale,
+transcription par lots puis reconstruction/nomination. Audio, VAD et voix sont sauvegardés
+séparément pour les itérations. Le parcours classique reste sélectionné par défaut.
+Voir [le guide de comparaison](docs/AUDIO_FIRST.md) ; qualité et vitesse à mesurer sur
+les réunions réelles, compte rendu LLM encore à développer.

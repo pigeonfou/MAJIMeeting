@@ -1,6 +1,6 @@
 # Progression MAJIMeeting
 
-Mise à jour : 30 octobre 2026.
+Mise à jour : 2 novembre 2026.
 
 ## État global
 Jalon 2 : vitesse et résultats de transcription validés par l'utilisateur sur la réunion
@@ -675,3 +675,37 @@ stable restent à réaliser.
 - À réaliser sur le PC utilisateur : validation ergonomique, raccourcis Windows,
   réouverture des réunions, capture WASAPI et traitement CUDA depuis cette interface.
   Les essais matériels reportés et jalons IA/documentaires restent à réaliser.
+
+
+## 2 novembre 2026 — premier parcours audio avant transcription
+
+- Option expérimentale, classique conservé par défaut : préparation PCM mono16kHz,
+  contrôle des niveaux/normalisation bornée facultative, VAD persistant, diarisation
+  globale par piste, Whisper sur clips de parole puis dialogue/nomination par extraits.
+- Sorties régulière et exclusive Community-1 conservées ; exclusive utilisée pour
+  certaines coupures, régulière pour les attributions et ambiguïtés. Pas de séparation
+  acoustique ni identification certaine des voix superposées.
+- Clips limités à29,5s avec contexte, fenêtres configurables, axes temporels conservés,
+  un/deux workers et mécanismes de reprise GPU existants ; VAD interne Whisper évité.
+- Étapes audio/VAD/voix indépendantes avec empreintes de sources, paramètres, modèle,
+  runtime et code worker. Publication des résultats par renommage après succès ;
+  étapes incomplètes ignorées, cache endommagé conservé à part puis recalculé.
+- Réessayer la diarisation d’un résultat audio-first réutilise audio et VAD, conserve le
+  texte/corrections, ne relance pas Whisper en décodage. Changement des sources depuis
+  la transcription refusé pour une simple réattribution. Modèles GPU successifs.
+- Paramètres : choix du parcours, normalisation facultative, seuil VAD et silence ;
+  diagnostic des étapes réutilisées. Audio entièrement silencieux : modèles non chargés.
+- Tests locaux :179tests réussis et Ruff réussi ; répertoires cache Windows courts
+  avec empreintes complètes vérifiées et refus explicite des collisions. VAD ONNX réel sur silence hors ligne ;
+  autres scénarios : ordre, horodatages, cache/invalidation/corruption/annulation,
+  sources intactes, trous, corrections, chevauchements, clips et deux workers, choix GUI.
+- Test d’intégration Whisper CPU réel étendu aux clips du nouveau parcours et au VAD
+  réel ; Community-1 simulé pour cet essai (modèle soumis à accès, pas de réunion réelle).
+  Contrôle local Whisper CPU réel réussi : séquentiel et lots avec clips ;
+  modèle tiny sur silence synthétique, sans validation de qualité. CI Windows/Linux
+  et publication DEV à terminer.
+- Guide : `docs/AUDIO_FIRST.md`. À réaliser sur PC utilisateur : comparer les deux
+  parcours sur la même réunion, temps global, mots faibles et aux changements de voix,
+  nombre de groupes, passages simultanés, CUDA, longues réunions et reprise après kill.
+- Filtrage spectral/débruitage, qualification du nouveau parcours et compte rendu LLM
+  restent à réaliser ; aucun gain de qualité ou de vitesse déclaré à ce stade.

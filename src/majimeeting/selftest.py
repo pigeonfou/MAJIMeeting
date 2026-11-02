@@ -99,6 +99,7 @@ def inference_smoke(model_path):
         assert execution['device'] == 'cpu' and execution['compute_type'] == 'int8'
         assert 'cublas64_12.dll' in execution['fallback_reason']
         timestamp_boundary_smoke(store, TranscriptionOptions(model_path))
+        audio_first_smoke(model_path)
     return 0
 
 
@@ -294,3 +295,39 @@ def native_parallel_smoke(model_path):
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(decode) for _ in range(2)]
         assert [future.result(timeout=60) for future in futures] == [[1], [1]]
+
+
+def audio_first_smoke(model_path):
+    """Real offline PCM/VAD and real Whisper clips; synthetic Community-1 output only."""
+    import sys
+
+    from majimeeting.audio_first_pipeline import process_audio_first
+    from majimeeting.audio_preparation import PreparationOptions, prepare_meeting
+    from majimeeting.diarization_options import DiarizationOptions
+    with tempfile.TemporaryDirectory(prefix='majimeeting-audio-first-') as directory:
+        root = Path(directory)
+        store = MeetingStore(root / 'data')
+        meeting = store.create('Synthetic audio-first API integration')
+        writer = FragmentWriter(store.root / meeting / 'track-00', 16000, 1, {})
+        writer.write(b'\0\0' * 32 * 16000, 2.)
+        writer.close()
+        store.finish(meeting, 'completed')
+        actual_vad = prepare_meeting(store, meeting, PreparationOptions())
+        assert actual_vad[0]['speech']['result']['regions'] == []
+        # Force decode requests on silence to exercise both real clip timestamp APIs.
+        community = root / 'synthetic-community'
+        community.mkdir()
+        (community / 'config.yaml').write_text('synthetic worker output, no actual Community-1')
+        for batched, workers in ((False, 1), (True, 1), (True, 2)):
+            job = process_audio_first(store, meeting, replace(TranscriptionOptions(model_path),
+                batched=batched, batch_size=2, beam_size=1, gpu_workers=workers), sys.executable, community,
+                'cpu', 0, DiarizationOptions(), PreparationOptions(vad_threshold=.6),
+                detector=lambda samples: [dict(start=0, end=len(samples))],
+                worker=lambda *args: dict(turns=[], exclusive_turns=[]))
+            assert all(2 <= row['start'] < row['end'] <= 34 for row in store.segments(job))
+            with store.connect() as db:
+                metadata = json.loads(db.execute('SELECT options FROM transcription_jobs WHERE id=?',
+                                                (job,)).fetchone()[0])
+            assert metadata['pipeline']['internal_whisper_vad'] is False
+            assert metadata['metrics']['attempts'][0]['completed_audio_seconds'] == 32
+        print('Audio-first real offline PCM/VAD and Whisper clip APIs passed; Community-1 synthetic')

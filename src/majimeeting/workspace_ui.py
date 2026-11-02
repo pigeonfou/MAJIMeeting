@@ -105,6 +105,9 @@ def build_processing(panel):
 
     # Model installation and performance controls no longer occupy the reading area.
     panel.settings_page, settings = page('Paramètres', 'Ces réglages sont réutilisés pour les prochains traitements.')
+    from majimeeting.pipeline_controls import PipelineControls
+    panel.pipeline_controls = PipelineControls(panel.settings)
+    settings.addWidget(panel.pipeline_controls)
     section(settings, 'Modèle de transcription', [
         ('Dossier local', panel.model), ('', panel.browse), ('', panel.download)])
     section(settings, 'Calcul et qualité', [

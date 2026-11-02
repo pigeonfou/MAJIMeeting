@@ -143,7 +143,8 @@ def audio_batches(track, destination, cancel=None, max_seconds=300):
 
 
 def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda message: None,
-                       model_factory=None, cuda_prepare=None, pipeline_factory=None):
+                       model_factory=None, cuda_prepare=None, pipeline_factory=None,
+                       batch_source=None, pipeline_metadata=None):
     options.validate()
     check_cancel(cancel)
     tracks = sorted((store.root / meeting_id).glob('track-*'))
@@ -152,6 +153,12 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
         raise ValueError('Aucune piste audio finalisée à transcrire.')
     job = uuid.uuid4().hex
     store.start_transcription(job, meeting_id, options)
+    if pipeline_metadata is not None:
+        with store.connect() as db:
+            row = db.execute('SELECT options FROM transcription_jobs WHERE id=?', (job,)).fetchone()
+            details = json.loads(row['options'])
+            details['pipeline'] = pipeline_metadata
+            db.execute('UPDATE transcription_jobs SET options=? WHERE id=?', (json.dumps(details), job))
     effective, reason = options, ''
     started = time.perf_counter()
     metrics = {'attempts': []}
@@ -172,10 +179,10 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
                                 gpu_workers=effective.gpu_workers, window_seconds=effective.window_seconds)
             retry = False
             try:
-                if effective.device == 'cuda':
+                if effective.device == 'cuda' and getattr(batch_source, 'has_audio', True):
                     (cuda_prepare or prepare_cuda)(effective.cuda_library_path)
                 _run_inference(store, job, tracks, effective, cancel, progress, model_factory,
-                               pipeline_factory, attempt)
+                               pipeline_factory, attempt, batch_source)
             except (RuntimeError, OSError, ValueError) as exc:
                 oom = any(token in str(exc).lower() for token in (
                     'out of memory', 'cuda_error_out_of_memory', 'cublas_status_alloc_failed'))
@@ -225,9 +232,13 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
 
 
 def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
-                   pipeline_factory, metrics):
+                   pipeline_factory, metrics, batch_source=None):
     model = runner = segments = None
     try:
+        if not getattr(batch_source, 'has_audio', True):
+            metrics['skipped_no_speech'] = True
+            progress('Aucune parole détectée : modèle Whisper non chargé.')
+            return
         if model_factory is None:
             from faster_whisper import WhisperModel
             model_factory = WhisperModel
@@ -252,12 +263,13 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
         if options.gpu_workers == 2:
             runner = None
             _run_parallel(store, job, tracks, options, cancel, progress, model,
-                          pipeline_factory, metrics)
+                          pipeline_factory, metrics, batch_source)
             return
         with tempfile.TemporaryDirectory(prefix='majimeeting-') as temp:
             batch_path = Path(temp) / 'batch.wav'
             for track in tracks:
-                batches = iter(audio_batches(track, batch_path, cancel, max_seconds=options.window_seconds))
+                batches = iter((batch_source or audio_batches)(track, batch_path, cancel,
+                                                        max_seconds=options.window_seconds))
                 while True:
                     check_cancel(cancel)
                     before = time.perf_counter()
@@ -274,6 +286,8 @@ def _run_inference(store, job, tracks, options, cancel, progress, model_factory,
                               'vad_filter': True, 'without_timestamps': False, 'word_timestamps': True}
                     if options.batched:
                         kwargs['batch_size'] = options.batch_size
+                    if batch_source is not None and hasattr(batch_source, 'decode_options'):
+                        kwargs.update(batch_source.decode_options(track.name, offset, duration, options.batched))
                     before = time.perf_counter()
                     try:
                         segments, _ = runner.transcribe(str(batch_path), **kwargs)
@@ -365,7 +379,8 @@ def collect_batch_sizes(runner, metrics, capacity):
     sizes.clear()
 
 
-def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline_factory, metrics):
+def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline_factory, metrics,
+                  batch_source=None):
     """Two bounded windows in flight; separate pipelines share one CT2 model's workers."""
     import shutil
     from collections import deque
@@ -389,9 +404,11 @@ def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline
             runner = pipeline_factory(model=model)
             before = time.perf_counter()
             try:
+                decode_options = batch_source.decode_options(track_name, offset, duration, True) \
+                    if batch_source is not None and hasattr(batch_source, 'decode_options') else {'vad_filter': True}
                 segments, _ = runner.transcribe(str(path), language=options.language,
-                    beam_size=options.beam_size, vad_filter=True, without_timestamps=False, word_timestamps=True,
-                    batch_size=options.batch_size)
+                    beam_size=options.beam_size, without_timestamps=False, word_timestamps=True,
+                    batch_size=options.batch_size, **decode_options)
                 segments = iter(segments)
             finally:
                 local['inference_seconds'] += time.perf_counter() - before
@@ -444,7 +461,7 @@ def _run_parallel(store, job, tracks, options, cancel, progress, model, pipeline
                 index = 0
                 scratch = Path(temp) / 'prepare.wav'
                 for track in tracks:
-                    batches = iter(audio_batches(track, scratch, cancel,
+                    batches = iter((batch_source or audio_batches)(track, scratch, cancel,
                                                  max_seconds=options.window_seconds))
                     while True:
                         checkpoint()
