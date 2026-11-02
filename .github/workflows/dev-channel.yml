@@ -14,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   test:
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -43,12 +44,14 @@ jobs:
       - name: Dependency consistency
         run: python -m pip check
       - name: Tests without network (Linux)
+        timeout-minutes: 12
         if: runner.os == 'Linux'
-        run: python -S scripts/offline_checks.py python -m pytest -q
+        run: python -S scripts/offline_checks.py python -m pytest -q -o faulthandler_timeout=90
       - name: Tests without network (Windows)
+        timeout-minutes: 12
         if: runner.os == 'Windows'
         shell: powershell
-        run: ./scripts/offline-windows.ps1 -Python (Get-Command python).Source -Arguments @('-m','pytest','-q')
+        run: ./scripts/offline-windows.ps1 -Python (Get-Command python).Source -Arguments @('-m','pytest','-q','-o','faulthandler_timeout=90')
       - name: Lint
         run: python -m ruff check .
       - name: Source GUI startup without network (Linux)

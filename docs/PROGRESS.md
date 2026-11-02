@@ -766,7 +766,12 @@ stable restent à réaliser.
 - CI source renforcée : tests et contrôles hors Internet sous seccomp Linux / pare-feu
   temporaire du runner Windows. Téléchargements autorisés uniquement dans les étapes
   connectées explicites. Aucune règle pare-feu installée automatiquement sur PC utilisateur.
-- Guide :docs/GUIDED_VOICES.md. CI et publication DEV à terminer.
+- Complément local :21tests de calcul/protocole/conservation des réglages réussis avec
+  sockets Internet bloquées au noyau (3tests GUI exclus dans cet environnement).
+- Première CI Linux41473785505 réussie :202tests, Qt/lecture et inférence CPU réelle
+  sans accès Internet. Windows en cours ; ajout final d’un test pour ne pas écraser
+  les réglages de regroupement lors du choix du modèle d’empreintes (203tests prévus).
+- Guide :docs/GUIDED_VOICES.md. CI finale et publication DEV à terminer.
 - À réaliser sur PC utilisateur : deux/trois extraits isolés par personne du groupe
   confondu, aperçu puis quelques écoutes de contrôle, application/restauration et
   diagnostic du modèle d’empreintes CUDA. Précision, voix inconnues non représentées,

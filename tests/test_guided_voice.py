@@ -397,3 +397,31 @@ def test_repeated_guidance_does_not_rename_an_untargeted_group(scene):
     second=scene.propose(scope=bob)
     apply_proposals(scene.store,second,accepted(scene.store,second))
     assert scene.store.segments('job')[0]['speaker']=='Ally confirmé'
+
+
+def test_model_configuration_preserves_existing_clustering_controls(monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    import majimeeting.diarization_ui as configuration
+    from majimeeting.guided_ui import GuidedVoiceDialog
+    data={'diarization_tuning':'per-track settings kept','diarization_speakers':3}
+    class Dialog:
+        def __init__(self,*args,**kwargs):
+            self.controls=SimpleNamespace(hide=lambda: None)
+            self.buttons=SimpleNamespace(button=lambda _: SimpleNamespace(setText=lambda _: None))
+            self.python=SimpleNamespace(text=lambda: 'new-python.exe')
+            self.model=SimpleNamespace(text=lambda: 'community-local')
+            self.device=SimpleNamespace(currentText=lambda: 'cuda')
+        def setWindowTitle(self,*args): pass
+        def findChild(self,*args): return SimpleNamespace(setCurrentIndex=lambda _: None)
+        def exec(self): return QDialog.DialogCode.Accepted
+        def values(self): pytest.fail('must not overwrite unrelated tuning/counts')
+    monkeypatch.setattr(configuration,'DiarizationDialog',Dialog)
+    current=[]
+    owner=SimpleNamespace(python='old',model='old',device=SimpleNamespace(currentText=lambda:'cpu',
+        setCurrentText=lambda value: current.append(value)),settings=SimpleNamespace(setValue=lambda k,v:data.__setitem__(k,v)),
+        invalidate=lambda: None)
+    GuidedVoiceDialog.configure_runtime(owner)
+    assert owner.python=='new-python.exe' and owner.model=='community-local'
+    assert current==['cuda']
+    assert data['diarization_tuning']=='per-track settings kept' and data['diarization_speakers']==3

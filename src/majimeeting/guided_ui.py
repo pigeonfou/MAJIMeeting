@@ -224,9 +224,15 @@ class GuidedVoiceDialog(QDialog):
         from majimeeting.diarization_ui import DiarizationDialog
         dialog = DiarizationDialog(self,initial=dict(python=self.python,model=self.model,device=self.device.currentText()))
         dialog.setWindowTitle('Modèle et runtime pour les références vocales')
+        dialog.controls.hide()
+        dialog.findChild(QTabWidget).setCurrentIndex(1)
         dialog.buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Utiliser ces paramètres')
         if dialog.exec()==QDialog.DialogCode.Accepted:
-            self.python,self.model,device,_,_ = dialog.values()
+            self.python = dialog.python.text().strip()
+            self.model = dialog.model.text().strip()
+            device = dialog.device.currentText()
+            for key,value in (('diarization_python',self.python),('diarization_model',self.model),('diarization_device',device)):
+                self.settings.setValue(key,value)
             self.device.setCurrentText(device)
             self.invalidate()
 
