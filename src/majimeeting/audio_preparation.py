@@ -65,6 +65,8 @@ def detect_speech(audio, options, cancel=None, detector=None):
     """Bound VAD RAM to ten minutes; overlap blocks without shifting timestamps."""
     import numpy as np
     if detector is None:
+        from majimeeting.offline_runtime import disable_onnx_telemetry
+        disable_onnx_telemetry()
         from faster_whisper.vad import VadOptions, get_speech_timestamps
         vad = VadOptions(threshold=options.vad_threshold,
                          min_silence_duration_ms=options.min_silence_ms,

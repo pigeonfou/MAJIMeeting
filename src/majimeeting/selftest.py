@@ -21,6 +21,8 @@ from majimeeting.transcription import (
 
 
 def inference_smoke(model_path):
+    from majimeeting.offline_runtime import disable_onnx_telemetry
+    disable_onnx_telemetry()
     # Force the decoder to run even on silence, rather than only testing model import.
     model = WhisperModel(model_path, device='cpu', compute_type='int8', local_files_only=True)
     segments, _ = model.transcribe(np.zeros(16000, dtype=np.float32), language='fr',
@@ -237,6 +239,11 @@ def editor_smoke():
         overview.names[0].setText('Alice')
         overview.apply_names()
         overview.close()
+        from majimeeting.guided_ui import GuidedVoiceDialog
+        guidance = GuidedVoiceDialog(store,'voices-smoke',seed=store.segments('voices-smoke')[0])
+        assert guidance.scope.currentData() == 'track-00:A'
+        assert not guidance.apply.isEnabled()
+        guidance.close()
         assert store.segments('voices-smoke')[0]['speaker'] == 'Alice'
         editor.accept()
         app.processEvents()

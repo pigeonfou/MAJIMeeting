@@ -59,3 +59,8 @@ restent disponibles depuis ces espaces. Aucun compte rendu LLM n’est encore g�
 Le parcours expérimental **audio → VAD → voix → transcription** est sélectionnable
 dans Paramètres. Voir [son guide et ses limites](AUDIO_FIRST.md). Le parcours classique
 reste proposé par défaut pour faciliter la comparaison.
+
+
+**Intervenants → Séparer des voix confondues…** ouvre la correction guidée par extraits
+de référence. Depuis l’éditeur, le bouton équivalent présélectionne le passage, sa piste
+et son groupe. Voir [le guide des références vocales](GUIDED_VOICES.md).

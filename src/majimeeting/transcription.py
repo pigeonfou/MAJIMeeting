@@ -146,6 +146,8 @@ def transcribe_meeting(store, meeting_id, options, cancel=None, progress=lambda 
                        model_factory=None, cuda_prepare=None, pipeline_factory=None,
                        batch_source=None, pipeline_metadata=None):
     options.validate()
+    from majimeeting.offline_runtime import disable_onnx_telemetry
+    disable_onnx_telemetry()
     check_cancel(cancel)
     tracks = sorted((store.root / meeting_id).glob('track-*'))
     tracks = [t for t in tracks if (t / 'track.json').is_file() and any(t.glob('*.wav'))]

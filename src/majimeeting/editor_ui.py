@@ -81,6 +81,9 @@ class TranscriptEditor(QDialog):
         self.rename = QPushButton('Nommer tous les passages du groupe sélectionné…')
         self.rename.clicked.connect(self.rename_group)
         layout.addWidget(self.rename)
+        self.reference_button = QPushButton('Choisir un extrait de référence pour séparer des voix confondues…')
+        self.reference_button.clicked.connect(self.open_guided)
+        layout.addWidget(self.reference_button)
         self.history = QPlainTextEdit()
         self.history.setReadOnly(True)
         self.history.setMaximumHeight(120)
@@ -128,6 +131,7 @@ class TranscriptEditor(QDialog):
             widget.setEnabled(row is not None)
         self.rename.setEnabled(row is not None and bool(row['speaker_group']))
         self.listen.setEnabled(row is not None and self.future is None)
+        self.reference_button.setEnabled(row is not None and self.future is None)
         self.text.setPlainText(row['corrected_text'] if row else '')
         self.speaker.setText(row['speaker'] if row else '')
         if row:
@@ -141,6 +145,15 @@ class TranscriptEditor(QDialog):
                 for edit in edits))
         else:
             self.history.clear()
+
+    def open_guided(self):
+        if self.current() is None or self.future is not None:
+            return
+        self.stop()
+        from majimeeting.guided_ui import GuidedVoiceDialog
+        dialog = GuidedVoiceDialog(self.store,self.job,self,seed=self.current())
+        dialog.exec()
+        self.reload(self.table.currentRow())
 
     def rename_group(self):
         from majimeeting.speakers import name_group

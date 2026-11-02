@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         for button in (self.processing.full_analysis, self.processing.transcribe_button):
             button.setEnabled(idle and selected)
         for button in (self.processing.edit_button, self.processing.speaker_button,
-                       self.processing.diarize_button, self.processing.export_button):
+                       self.processing.diarize_button, self.processing.export_button, self.processing.guided_button):
             button.setEnabled(idle and job)
         for action, button in getattr(self, 'command_actions', []):
             action.setEnabled(button.isEnabled())
@@ -258,7 +258,7 @@ class MainWindow(QMainWindow):
             self.task = ("export", self.pool.submit(export_track, folder / name, destination))
 
     def closeEvent(self, event):
-        if self.session or self.task:
+        if self.session or self.task or getattr(self, 'guided_busy', False):
             QMessageBox.information(self, "Traitement en cours",
                                     "Arrêtez l'enregistrement et attendez la fin du traitement.")
             event.ignore()
