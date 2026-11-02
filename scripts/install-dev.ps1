@@ -8,10 +8,24 @@ $ErrorActionPreference = 'Stop'
 if (-not (Get-Command py.exe -ErrorAction SilentlyContinue)) {
     throw 'Installez Python 3.11 x64 avec le lanceur py, puis relancez Installer-DEV.cmd.'
 }
+$installed = Test-Path (Join-Path $Root 'state.json')
 $manager = Join-Path $PSScriptRoot 'dev_channel.py'
-$arguments = @('-3.11', '-X', 'utf8', $manager, '--root', $Root, 'bootstrap')
+$arguments = @('-X', 'utf8', $manager, '--root', $Root, 'bootstrap', '--refresh')
+$engine = (Get-Command py.exe).Source
+if ($installed) {
+    $state = Get-Content (Join-Path $Root 'state.json') -Raw | ConvertFrom-Json
+    $fingerprint = [string]$state.current.runtime
+    if ($fingerprint -notmatch '^[0-9a-f]{64}$') { throw 'Empreinte du runtime DEV invalide.' }
+    $engine = Join-Path $Root ('runtimes/' + $fingerprint.Substring(0,16) + '/Scripts/python.exe')
+    if (-not (Test-Path $engine)) { throw 'Le runtime DEV existant est introuvable.' }
+    # The catalogue lock needs Qt; a base Python installation need not contain PySide6.
+    $arguments = @('-I') + $arguments
+    Write-Host 'Actualisation avec le runtime DEV existant, sans reinstaller les dependances.'
+} else {
+    $arguments = @('-3.11') + $arguments
+}
 if ($Bundle) { $arguments += @('--bundle', $Bundle, '--manifest', $Manifest) }
-& py.exe @arguments
+& $engine @arguments
 if ($LASTEXITCODE -ne 0) { throw "Installation DEV interrompue. Consultez $Root/dev-errors.log" }
 if (-not $NoShortcuts) {
     $shell = New-Object -ComObject WScript.Shell
@@ -38,4 +52,8 @@ if (-not $NoShortcuts) {
     }
 }
 Write-Host "Installation terminee : $Root"
-Write-Host 'Fermez les deux applications avant Copier mes reunions vers DEV.'
+if ($installed) {
+    Write-Host 'Donnees DEV conservees. Ne recopiez pas vos reunions : lancez MAJIMeeting DEV.'
+} else {
+    Write-Host 'Fermez les deux applications avant Copier mes reunions vers DEV.'
+}

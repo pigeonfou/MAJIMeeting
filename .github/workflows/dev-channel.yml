@@ -103,10 +103,23 @@ jobs:
         shell: powershell
         run: |
           $root = Join-Path $env:RUNNER_TEMP 'MAJIMeeting DEV integration'
-          & ./scripts/install-dev.ps1 -Root $root -Bundle (Resolve-Path dev-dist/MAJIMeeting-DEV.zip).Path -Manifest (Resolve-Path dev-dist/dev-manifest.json).Path -NoShortcuts
+          $first = Get-Content dev-dist/dev-manifest.json -Raw | ConvertFrom-Json
+          $first.commit = 'a' * 40
+          $oldManifest = Join-Path $env:RUNNER_TEMP 'initial-dev-manifest.json'
+          [System.IO.File]::WriteAllText($oldManifest, ($first | ConvertTo-Json -Depth 100), [System.Text.UTF8Encoding]::new($false))
+          & ./scripts/install-dev.ps1 -Root $root -Bundle (Resolve-Path dev-dist/MAJIMeeting-DEV.zip).Path -Manifest $oldManifest -NoShortcuts
           if ($LASTEXITCODE -ne 0) { throw 'DEV bootstrap failed' }
           py -3.11 -X utf8 "$root/launcher.py" run --smoke
           if ($LASTEXITCODE -ne 0) { throw 'DEV launcher failed' }
+          $before = Get-Content (Join-Path $root 'state.json') -Raw | ConvertFrom-Json
+          $marker = Join-Path $before.data 'keep-existing-data.txt'
+          Set-Content $marker 'existing meeting data' -Encoding ASCII
+          & ./scripts/install-dev.ps1 -Root $root -Bundle (Resolve-Path dev-dist/MAJIMeeting-DEV.zip).Path -Manifest (Resolve-Path dev-dist/dev-manifest.json).Path -NoShortcuts
+          if ($LASTEXITCODE -ne 0) { throw 'Existing DEV refresh failed' }
+          $after = Get-Content (Join-Path $root 'state.json') -Raw | ConvertFrom-Json
+          $expected = Get-Content dev-dist/dev-manifest.json -Raw | ConvertFrom-Json
+          if ($after.current.commit -ne $expected.commit -or $after.previous.commit -ne $first.commit -or $after.data -ne $before.data) { throw 'Existing DEV state was not preserved/upgraded' }
+          if ((Get-Content $marker -Raw).Trim() -ne 'existing meeting data') { throw 'Existing DEV data changed' }
           $state = Get-Content "$root/state.json" -Raw | ConvertFrom-Json
           $python = Join-Path $root ("runtimes/" + $state.current.runtime.Substring(0,16) + "/Scripts/python.exe")
           $entry = Join-Path $root ("versions/" + $state.current.commit + "/scripts/run_source.py")

@@ -50,3 +50,21 @@ Le workflow historique **CI** conserve les constructions d'installateurs pour le
 La préparation initiale reste la phase lourde. Les livraisons suivantes portent sur un petit ZIP et un contrôle de démarrage ; les tests automatiques restent nécessaires avant publication. Aucun délai de quelques secondes entre demande et version validée n'est garanti. Le changement de canal ne modifie pas les performances des moteurs IA.
 
 Le retour arrière restaure le code et l'environnement, pas une sauvegarde automatique du catalogue. Les migrations actuelles sont additives ; toute évolution destructive du format devra prévoir une migration/sauvegarde distincte et un changement du numéro de compatibilité. Aucune purge automatique des anciennes versions, environnements ou copies audio dans cette première version.
+
+
+## Mise à niveau d’un ancien lanceur (2 novembre 2026)
+
+Certaines réponses GitHub plaçaient une ancienne release avant une publication plus
+récente. Les anciens lanceurs choisissaient alors une ancienne révision. Le lanceur
+corrigé trie les versions complètes par date de publication avant de vérifier les fichiers.
+
+Pour la première mise à niveau depuis un ancien lanceur : fermer DEV, télécharger
+**MAJIMeeting-DEV-Setup.zip de la nouvelle release**, l’extraire entièrement puis relancer
+**Installer-DEV.cmd**. Le bootstrap frais actualise maintenant aussi une installation
+existante, tout en conservant son catalogue actif, ses références, modèles, réglages
+et la version précédente. Ne pas recopier le catalogue après cette réparation.
+Lancer ensuite MAJIMeeting DEV. Les mises à jour suivantes utilisent le raccourci habituel.
+
+L’API interne `bootstrap` sans `--refresh` conserve le mode réparation des raccourcis
+sans connexion. L’installeur fourni utilise `--refresh` ; une archive/manifeste locale
+peut aussi être fournie pour une mise à niveau sans téléchargement.
