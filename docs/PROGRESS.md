@@ -695,7 +695,8 @@ stable restent à réaliser.
   la transcription refusé pour une simple réattribution. Modèles GPU successifs.
 - Paramètres : choix du parcours, normalisation facultative, seuil VAD et silence ;
   diagnostic des étapes réutilisées. Audio entièrement silencieux : modèles non chargés.
-- Tests locaux :178tests réussis, Ruff réussi. VAD ONNX réel sur silence hors ligne ;
+- Tests locaux :179tests réussis et Ruff réussi ; répertoires cache Windows courts
+  avec empreintes complètes vérifiées et refus explicite des collisions. VAD ONNX réel sur silence hors ligne ;
   autres scénarios : ordre, horodatages, cache/invalidation/corruption/annulation,
   sources intactes, trous, corrections, chevauchements, clips et deux workers, choix GUI.
 - Test d’intégration Whisper CPU réel étendu aux clips du nouveau parcours et au VAD

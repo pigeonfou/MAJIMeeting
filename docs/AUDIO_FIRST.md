@@ -50,7 +50,8 @@ comparer avec le parcours classique et essayer un seuil VAD plus bas.
 ## Réutilisation et corrections
 
 Les étapes sont enregistrées dans `analysis-cache/v1` du dossier de la réunion.
-Chaque résultat publié possède un manifeste et des empreintes de contenu. Les étapes
+Chaque résultat publié possède un manifeste et des empreintes de contenu. Les noms
+de répertoires sont raccourcis pour Windows, avec vérification de l’empreinte complète. Les étapes
 incomplètes ne sont pas réutilisées ; une étape endommagée est conservée à part puis
 recalculée. Les copies de travail occupent environ 115 Mo par heure et par piste ;
 plusieurs réglages de normalisation peuvent conserver plusieurs copies.

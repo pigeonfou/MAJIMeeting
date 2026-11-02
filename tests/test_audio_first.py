@@ -339,3 +339,18 @@ def test_precomputed_decode_clips_are_bounded_and_keep_original_offsets(setup):
     assert sum(c['end'] - c['start'] for c in decoded['clip_timestamps']) == 95
     serial = batches.decode_options('track-00', .4, 95, False)
     assert serial['clip_timestamps'] == [0., 29.5, 29.5, 59., 59., 88.5, 88.5, 95.]
+
+
+
+def test_cache_uses_short_windows_paths_but_checks_full_key(tmp_path):
+    from majimeeting.analysis_cache import file_digest
+    result = cached_stage(tmp_path, 'audio', {}, lambda _: dict(ok=True))
+    assert len(result['path'].name) == 24 and len(result['key']) == 64
+    manifest_path = result['path'] / 'stage.json'
+    manifest = json.loads(manifest_path.read_text())
+    manifest['key'] = result['key'][:24] + 'f' * 40
+    manifest_path.write_text(json.dumps(manifest))
+    (result['path'] / 'ready.sha256').write_text(file_digest(manifest_path))
+    with pytest.raises(RuntimeError, match='Collision'):
+        cached_stage(tmp_path, 'audio', {}, lambda _: pytest.fail('must retain existing stage'))
+    assert manifest_path.exists()

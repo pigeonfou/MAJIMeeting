@@ -26,7 +26,7 @@ def fingerprint(paths, root, cancel=None):
 def cached_stage(root, stage, inputs, build, cancel=None, progress=lambda _: None):
     key = hashlib.sha256(json.dumps(inputs, sort_keys=True, allow_nan=False).encode()).hexdigest()
     parent = Path(root) / stage
-    destination = parent / key
+    destination = parent / key[:24]
     started = time.monotonic()
     check_cancel(cancel)
     if destination.is_dir():
@@ -34,7 +34,9 @@ def cached_stage(root, stage, inputs, build, cancel=None, progress=lambda _: Non
             if file_digest(destination / 'stage.json', cancel) != (destination / 'ready.sha256').read_text():
                 raise ValueError('Manifeste de cache modifié.')
             manifest = json.loads((destination / 'stage.json').read_text(encoding='utf-8'))
-            if manifest['key'] != key or manifest['inputs'] != json.loads(json.dumps(inputs)):
+            if manifest['key'] != key:
+                raise RuntimeError('Collision de répertoire de cache : empreinte complète différente.')
+            if manifest['inputs'] != json.loads(json.dumps(inputs)):
                 raise ValueError('Entrées de cache différentes.')
             for name, expected in manifest['files'].items():
                 path = Path(name)
@@ -48,9 +50,9 @@ def cached_stage(root, stage, inputs, build, cancel=None, progress=lambda _: Non
                         seconds=time.monotonic() - started)
         except (OSError, ValueError, KeyError, TypeError):
             # Preserve damaged evidence instead of treating it as a valid result.
-            destination.rename(parent / (key + '.invalid-' + uuid.uuid4().hex))
+            destination.rename(parent / (key[:12] + '.invalid-' + uuid.uuid4().hex[:8]))
     parent.mkdir(parents=True, exist_ok=True)
-    staging = parent / ('.stage-' + uuid.uuid4().hex)
+    staging = parent / ('.stage-' + uuid.uuid4().hex[:16])
     staging.mkdir()
     try:
         result = build(staging)
