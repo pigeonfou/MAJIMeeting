@@ -4,6 +4,7 @@ import threading
 import wave
 from concurrent.futures import CancelledError
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -264,7 +265,7 @@ def test_worker_protocol_preserves_window_order_and_uses_local_embedding_only(tm
         sample_rate=16000
         dimension=3
         def __init__(self,path,device):
-            assert path.endswith('embedding/pytorch_model.bin')
+            assert Path(path).parts[-2:] == ('embedding','pytorch_model.bin')
             self.device=device
         def __call__(self,batch):
             calls.append(batch.shape)

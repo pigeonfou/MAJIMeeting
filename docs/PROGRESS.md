@@ -776,3 +776,7 @@ stable restent à réaliser.
   confondu, aperçu puis quelques écoutes de contrôle, application/restauration et
   diagnostic du modèle d’empreintes CUDA. Précision, voix inconnues non représentées,
   faibles niveaux et vraies superpositions restent à qualifier. LLM toujours à développer.
+
+- Première CI Windows41473785505 :201tests réussis/1échec, assertion du test de worker
+  utilisant des séparateurs Linux. Le worker reçoit bien un chemin Windows natif.
+  Test corrigé via Path.parts ; validation finale203tests relancée. Aucun paquet publié.
